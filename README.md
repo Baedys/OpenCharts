@@ -1,1 +1,108 @@
 # OpenCharts
+
+Complément PowerPoint Windows open source, sous licence MIT. Le complément s'inscrit actuellement sous le nom **OpenSlideCharts**. Objectif de recherche et de développement : reproduire les fonctionnalités et interactions de think-cell. **La parité n'est pas atteinte. Ce dépôt contient un prototype fonctionnel, pas un remplacement complet.**
+
+## État actuel
+
+- Ruban PowerPoint avec insertion et modification de graphiques.
+- Six moteurs de géométrie : cascade, colonnes, barres, courbe, Mekko à deux segments et Gantt en jours relatifs.
+- Colonnes/barres groupées, empilées et 100 %, courbes multi-séries ; jusqu'à huit séries avec cellules absentes.
+- Rendu en groupes de formes et textes PowerPoint ordinaires ; les présentations restent visibles sans complément.
+- Éditeur de données, collage de tableaux Excel et données embarquées dans les groupes.
+- Liaison à une plage Excel enregistrée ; actualisation manuelle de la sélection ou de la présentation.
+- Recréation transactionnelle : une erreur de validation conserve le graphique précédent.
+
+Les limites et écarts sont suivis dans [PARITY.md](PARITY.md). La provenance des observations est décrite dans [RECONSTRUCTION.md](RECONSTRUCTION.md).
+
+## Compilation et installation
+
+Windows, PowerPoint de bureau et .NET Framework 4.x sont requis. Excel de bureau est requis pour les liens de données. Aucun SDK .NET, package NuGet ou service distant n'est nécessaire à cette version.
+
+Depuis une console PowerShell ouverte dans ce dossier :
+
+```powershell
+.\Build.ps1 -Test
+```
+
+Fermer PowerPoint, puis inscrire le complément pour l'utilisateur courant :
+
+```powershell
+.\Install.ps1
+```
+
+Ouvrir PowerPoint normalement. L'onglet **OpenSlideCharts** contient les commandes. Ne pas déplacer le dossier après inscription ; relancer `Install.ps1` après un déplacement. Le script détecte l'architecture Office Click-to-Run ; si elle n'est pas détectable, utiliser `-OfficeArchitecture x64` ou `-OfficeArchitecture x86`. Seul Office x64 a été testé localement.
+
+Désinstallation, PowerPoint fermé :
+
+```powershell
+.\Install.ps1 -Remove
+```
+
+Le script retire uniquement les clés d'inscription OpenSlideCharts. Il conserve les sources et les présentations.
+
+## Données
+
+Chaque ligne contient `Libellé`, `Valeur`, `Secondaire` et `Total`. Les plages Excel ne doivent pas contenir d'en-tête ; deux à quatre colonnes, jusqu'à 40 lignes pour l'import Excel. Les graphiques acceptent jusqu'à 80 lignes, mais les étiquettes denses ne sont pas encore optimisées.
+
+| Type | Valeur | Secondaire | Total |
+|---|---|---|---|
+| Cascade | Variation ou niveau absolu | Ignoré | Un niveau absolu remet le cumul à cette valeur |
+| Colonnes, barres, courbe | Valeur signée | Ignoré | Ignoré |
+| Mekko | Largeur positive ou nulle | Part bleue de 0 à 100 % | Ignoré |
+| Gantt | Début en jours relatifs | Durée strictement positive | Ignoré |
+
+Pour modifier, sélectionner le groupe entier et choisir **Modifier les données**. Les données sont sauvegardées avec le PPTX. Pour une liaison Excel, préciser fichier, feuille et plage ; **Importer Excel** lit les valeurs enregistrées. Les macros et mises à jour de liens externes sont désactivées pour cette ouverture de lecture. Un fichier absent ne supprime pas les données embarquées.
+
+**Multi-séries** ouvre un éditeur de matrice : première colonne = catégories, autres colonnes = séries. Le collage attend une première ligne d'en-têtes. Une cellule vide reste absente ; une courbe s'interrompt à cet endroit. Les empilements positifs et négatifs ont des bases séparées ; le mode 100 % accepte uniquement des valeurs positives ou nulles. Les liens Excel multi-séries ne sont pas encore disponibles : utiliser le collage ou **Importer JSON** avec le résultat du convertisseur ci-dessous.
+
+## Limites importantes
+
+Cette version n'édite pas les objets propriétaires think-cell et ne reproduit pas ses menus contextuels ni son placement automatique. Le moteur ne gère pas encore les secteurs/anneaux, les graphiques combinés, les dates calendaires ou les ruptures d'axe. L'actualisation n'est pas automatique et ne lit pas les modifications Excel non enregistrées.
+
+La réédition régénère les formes ; les personnalisations manuelles et animations des formes internes ne sont pas conservées. Les groupes doivent être sans rotation pour être réédités et mesurer au moins 320 × 240 points. Un groupe dissocié perd sa fonction d'édition structurée.
+
+## Validation
+
+`Build.ps1 -Test` exécute les tests numériques et de géométrie du moteur. `tests/OfficeSmoke.cs` vérifie le rendu natif, la persistance PPTX, l'import/actualisation Excel et la conservation d'un graphique en cas d'erreur. Le mode explicite `--renderer-only` exclut la vérification du chargement du ruban ; il ne doit pas être présenté comme validation du complément complet.
+
+Les tests d'intégration nécessitent Office installé et utilisent uniquement des documents synthétiques. Ils ne constituent pas une comparaison avec think-cell. Aucun résultat de parité visuelle n'est actuellement revendiqué.
+
+Résultats du premier jalon et limites détaillés dans [VALIDATION.md](VALIDATION.md) : 2 984 assertions moteur, 6 assertions de préservation des données d'éditeur, 37 tests Python et 65 contrôles Office avec le cas d'import optionnel.
+
+Après installation, fermer PowerPoint puis lancer `Test-Office.ps1`. Le script démarre PowerPoint normalement avant de piloter les tests : un démarrage Office réservé à l'automatisation peut omettre les compléments utilisateur. Les tests Excel créent leur propre instance. Les callbacks interactifs et Undo/Redo restent à vérifier. L'option `-InputJson chemin.json` ajoute un test de rendu et de persistance d'un graphique converti ; son résultat reste local.
+
+## Structure
+
+- `src/ChartCore.cs` : modèle et calcul géométrique indépendant d'Office.
+- `src/SeriesChart.cs` : géométrie multi-séries.
+- `src/OfficeAdapter.cs` : formes PowerPoint, persistance et lecture Excel.
+- `src/ChartEditor.cs` : éditeur WinForms.
+- `src/SeriesEditor.cs` : éditeur de matrice.
+- `src/Connect.cs` : interfaces COM et ruban.
+- `tests/` : tests du moteur et intégration Office.
+
+## Licence et contribution
+
+Code original distribué sous [licence MIT](LICENSE). Aucun installateur, binaire, code décompilé ou asset de think-cell n'est inclus. Projet indépendant et non affilié à think-cell. Toute contribution de parité doit préciser le comportement de référence, sa source et un test reproductible.
+
+## Inspection et conversion de données think-cell
+
+Les outils Python utilisent uniquement la bibliothèque standard, sans Office. Ils lisent le PPTX sans le modifier, inventorient les relations OOXML et inspectent les flux OLE nommés `think-cellXML`. Aucun fichier de référence propriétaire n'est distribué.
+
+```powershell
+python .\tools\inspect_thinkcell.py .\source.pptx --json .\inspection.json
+python .\tools\convert_thinkcell.py .\source.pptx --list
+python .\tools\convert_thinkcell.py .\source.pptx --chart 1 --kind Column --layout Stacked --json .\graphique.json
+```
+
+Le convertisseur accepte aussi `inspection.json` comme entrée. L'indice de graphique commence à 1 ; `--kind` (`Column`, `Bar`, `Line`) et `--layout` (`Clustered`, `Stacked`, `Percent`) sont obligatoires. `Line` exige `Clustered` ; `Percent` exige des valeurs non négatives. Les dépassements numériques des cumuls empilés sont refusés. Ces choix sont explicites : les codes internes think-cell ne sont pas traduits automatiquement. `--title` permet de choisir le titre du graphique produit.
+
+La conversion extrait uniquement les catégories, noms de séries et valeurs numériques observés des modèles `CSequenceChartSE`, dans la limite de 8 séries et 80 catégories. Elle refuse les références cassées, cellules non numériques ou manquantes, totaux `e`, connexions et modèles scatter/bubble. Une cellule vide n'est jamais remplacée silencieusement par zéro. Les styles, annotations, coordonnées, liaisons Excel et règles de disposition ne sont pas transférés. Ce n'est pas un import fidèle ni un éditeur d'objets think-cell ; l'original reste inchangé.
+
+L'inspection distingue les cellules numériques, textuelles, dates et types inconnus. Les classeurs XLSB imbriqués sont inventoriés, pas interprétés. Les limites de taille, chaînes CFB, doublons ZIP et déclarations DTD sont contrôlés ; aucun chemin d'archive n'est extrait sur disque.
+
+```powershell
+python -m unittest discover -s .\tests -p 'test_*.py' -v
+```
+
+Ces tests utilisent exclusivement des archives et graphes synthétiques créés par le projet.

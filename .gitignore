@@ -1,0 +1,11 @@
+bin/
+__pycache__/
+*.pyc
+*.user
+*.suo
+*.pdb
+.vs/
+test-results/
+reference-artifacts/
+examples/*.pptx
+examples/*.xlsx

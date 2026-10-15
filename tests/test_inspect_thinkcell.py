@@ -1,0 +1,201 @@
+"""Synthetic fixtures only: no proprietary presentations or payloads."""
+import importlib.util
+import io
+import pathlib
+import struct
+import unittest
+import warnings
+import zipfile
+
+MODULE = pathlib.Path(__file__).resolve().parents[1] / 'tools' / 'inspect_thinkcell.py'
+spec = importlib.util.spec_from_file_location('inspect_thinkcell', MODULE)
+reader = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(reader)
+
+
+def pptx(parts):
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
+        for name, content in parts:
+            archive.writestr(name, content)
+    return output.getvalue()
+
+
+def directory_entry(name, kind, start=reader.END, size=0, child=reader.FREE):
+    data = bytearray(128)
+    encoded = name.encode('utf-16le') + b'\0\0'
+    data[:len(encoded)] = encoded
+    struct.pack_into('<H', data, 64, len(encoded))
+    data[66:68] = bytes([kind, 1])
+    struct.pack_into('<III', data, 68, reader.FREE, reader.FREE, child)
+    struct.pack_into('<IQ', data, 116, start, size)
+    return bytes(data)
+
+
+def cfb(payload, mini=False):
+    """Original small CFB v3 fixture with one named stream."""
+    header = bytearray(512)
+    header[:8] = reader.CFB_MAGIC
+    struct.pack_into('<HHHHH',header,24,0x3e,3,0xfffe,9,6)
+    struct.pack_into('<IIIIIIIII',header,40,0,1,1,0,4096,3 if mini else reader.END,1 if mini else 0,reader.END,0)
+    struct.pack_into('<109I',header,76,0,*([reader.FREE]*108))
+    fat = [reader.FREE]*128
+    fat[0] = 0xfffffffd
+    fat[1] = reader.END
+    if mini:
+        if len(payload)>64:
+            raise ValueError('Fixture mini stream max 64 bytes')
+        fat[2] = fat[3] = reader.END
+        root = directory_entry('Root Entry',5,start=2,size=64,child=1)
+        stream = directory_entry('think-cellXML',2,start=0,size=len(payload))
+        mini_fat = struct.pack('<128I',reader.END,*([reader.FREE]*127))
+        blocks = [payload.ljust(512,b'\0'),mini_fat]
+    else:
+        content=payload.ljust(4096,b' ')
+        if len(content)!=4096:
+            raise ValueError('Fixture stream max 4096 bytes')
+        for i in range(2,9):
+            fat[i]=i+1
+        fat[9]=reader.END
+        root=directory_entry('Root Entry',5,child=1)
+        stream=directory_entry('think-cellXML',2,start=2,size=4096)
+        blocks=[content[i:i+512] for i in range(0,4096,512)]
+    return bytes(header)+struct.pack('<128I',*fat)+(root+stream).ljust(512,b'\0')+b''.join(blocks)
+
+
+MODEL = b'''<?xml version="1.0" encoding="UTF-8"?><root reqver="1"><version val="1"/>
+<CSequenceChartSE id="1"><m_strName>Revenue</m_strName><m_ect val="0"/><m_dtable idref="2"/></CSequenceChartSE>
+<CSequenceChartDataTable id="2"><m_bstrRangeName val="think-cellChild0"/><m_cscdser length="1"><elem idref="3"/></m_cscdser><ocol length="1"><elem idref="4"/></ocol></CSequenceChartDataTable>
+<CSequenceChartDataSeries id="3"><m_varsrc idref="5"/></CSequenceChartDataSeries>
+<CSequenceChartDataVector id="4"><m_varsrcCategory><m_varval type="5">Q1</m_varval></m_varsrcCategory><ocol length="1"><elem idref="6"/></ocol><m_scdscEquals idref="0"/></CSequenceChartDataVector>
+<CVariableSource id="5"><m_varval type="5">Sales</m_varval></CVariableSource>
+<CSequenceChartDataScalar id="6"><m_varsrcAbsolute idref="7"/><m_scdscconnect idref="0"/></CSequenceChartDataScalar>
+<CVariableSource id="7"><m_varval type="1" val="1.25E+01"/></CVariableSource></root>'''
+
+
+class CompoundTests(unittest.TestCase):
+    def test_regular_stream(self):
+        obj=reader.CompoundFile(cfb(MODEL))
+        self.assertEqual(obj.read('think-cellXML').rstrip(),MODEL)
+
+    def test_mini_stream(self):
+        value=b'<?xml version="1.0"?><root/>'
+        self.assertEqual(reader.CompoundFile(cfb(value,mini=True)).read('think-cellXML'),value)
+
+    def test_cycle_rejected(self):
+        damaged=bytearray(cfb(MODEL))
+        struct.pack_into('<I',damaged,512+2*4,2)
+        obj=reader.CompoundFile(bytes(damaged))
+        with self.assertRaisesRegex(reader.InspectionError,'cyclic'):
+            obj.read('think-cellXML')
+
+    def test_outside_sector_rejected(self):
+        damaged=bytearray(cfb(MODEL))
+        struct.pack_into('<I',damaged,512+2*4,100)
+        obj=reader.CompoundFile(bytes(damaged))
+        with self.assertRaises(reader.InspectionError):
+            obj.read('think-cellXML')
+
+    def test_directory_cycle_rejected(self):
+        damaged=bytearray(cfb(MODEL))
+        struct.pack_into('<I',damaged,1024+128+72,1)
+        with self.assertRaisesRegex(reader.InspectionError,'directory tree'):
+            reader.CompoundFile(bytes(damaged))
+
+    def test_truncation_rejected(self):
+        with self.assertRaises(reader.InspectionError):
+            reader.CompoundFile(cfb(MODEL)[:-1])
+
+    def test_difat_count_rejected(self):
+        damaged=bytearray(cfb(MODEL))
+        struct.pack_into('<I',damaged,72,999999)
+        with self.assertRaisesRegex(reader.InspectionError,'DIFAT'):
+            reader.CompoundFile(bytes(damaged))
+
+    def test_difat_extension(self):
+        original=cfb(MODEL)
+        header=bytearray(original[:512])
+        struct.pack_into('<I',header,44,2)
+        struct.pack_into('<II',header,68,2,1)
+        fat=[reader.FREE]*128
+        fat[0]=fat[3]=0xfffffffd
+        fat[1]=reader.END
+        fat[2]=0xfffffffc
+        for i in range(4,11):
+            fat[i]=i+1
+        fat[11]=reader.END
+        directory=bytearray(original[1024:1536])
+        struct.pack_into('<I',directory,128+116,4)
+        difat=struct.pack('<128I',3,*([reader.FREE]*126),reader.END)
+        extra_fat=struct.pack('<128I',*([reader.FREE]*128))
+        fixture=bytes(header)+struct.pack('<128I',*fat)+bytes(directory)+difat+extra_fat+original[1536:]
+        self.assertEqual(reader.CompoundFile(fixture).read('think-cellXML').rstrip(),MODEL)
+
+
+class ModelTests(unittest.TestCase):
+    def test_reference_graph_values_and_storage(self):
+        summary=reader.model_summary(reader.parse_xml(MODEL))
+        chart=summary['charts'][0]
+        self.assertEqual(summary['unresolved_idrefs'],[])
+        self.assertEqual(chart['automation_name'],'Revenue')
+        self.assertEqual(chart['child_package_stream'],'think-cellChild0/Package')
+        self.assertEqual(chart['series'][0]['label']['string'],'Sales')
+        self.assertEqual(chart['categories'][0]['label']['string'],'Q1')
+        self.assertEqual(chart['categories'][0]['values'][0]['absolute']['number'],12.5)
+        self.assertIsNone(chart['categories'][0]['values'][0]['relative'])
+
+    def test_duplicate_ids_rejected(self):
+        with self.assertRaisesRegex(reader.InspectionError,'Duplicate model'):
+            reader.model_summary(reader.parse_xml('<root><A id="1"/><B id="1"/></root>'))
+
+    def test_missing_reference_reported(self):
+        summary=reader.model_summary(reader.parse_xml('<root><CSequenceChartSE id="1"><m_dtable idref="9"/></CSequenceChartSE></root>'))
+        self.assertEqual(summary['unresolved_idrefs'],['9'])
+        self.assertIn('warning',summary['charts'][0])
+
+    def test_non_numeric_and_unknown_preserved(self):
+        self.assertEqual(reader.var_value(reader.parse_xml('<m_varval type="5"/>'))['string'],'')
+        self.assertIn('warning',reader.var_value(reader.parse_xml('<m_varval type="1" val="NaN"/>')))
+        self.assertEqual(reader.var_value(reader.parse_xml('<m_varval type="42" val="x"/>'))['attributes']['val'],'x')
+
+
+class PackageTests(unittest.TestCase):
+    def test_full_inspection_synthetic_package(self):
+        data=pptx([('ppt/embeddings/oleObject1.bin',cfb(MODEL)),
+                    ('ppt/slides/slide1.xml','<p:sld xmlns:p="'+reader.P+'"/>')])
+        result=reader.inspect_bytes(data)
+        self.assertEqual(result['counts']['thinkcell_chart_models'],1)
+        self.assertEqual(result['compound_files'][0]['streams'][0]['envelope']['xml_offset'],0)
+
+    def test_named_field_prefix(self):
+        root=reader.ET.Element('{'+reader.P+'}sld')
+        field=reader.ET.SubElement(root,'{'+reader.A+'}fld')
+        field.set('id','synthetic-id')
+        field.set('type','thinkcell<?xml version="1.0" encoding="UTF-16"?><root><PersistentType><m_strName>Heading</m_strName></PersistentType></root>')
+        result=reader.inspect_bytes(pptx([('ppt/slides/slide1.xml',reader.ET.tostring(root))]))
+        self.assertEqual(result['text_targets'][0]['model']['automation_names'],['Heading'])
+
+    def test_duplicate_zip_names_rejected(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            data=pptx([('a.xml','<a/>'),('a.xml','<a/>')])
+        with self.assertRaisesRegex(reader.InspectionError,'Duplicate ZIP'):
+            reader.inspect_bytes(data)
+
+    def test_zip_traversal_rejected(self):
+        with self.assertRaisesRegex(reader.InspectionError,'Unsafe ZIP'):
+            reader.inspect_bytes(pptx([('../escape','text')]))
+
+    def test_dtd_rejected_utf8_and_utf16(self):
+        xml='<!DOCTYPE root [<!ENTITY danger SYSTEM "file:///private">]><root>&danger;</root>'
+        for encoding in ['utf-8','utf-16']:
+            with self.assertRaisesRegex(reader.InspectionError,'DTD'):
+                reader.parse_xml(xml.encode(encoding))
+
+    def test_depth_limit(self):
+        with self.assertRaisesRegex(reader.InspectionError,'complexity'):
+            reader.parse_xml('<a>'*130+'</a>'*130)
+
+
+if __name__=='__main__':
+    unittest.main()
