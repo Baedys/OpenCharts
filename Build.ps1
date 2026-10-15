@@ -10,7 +10,7 @@ $sources = @(Get-ChildItem -LiteralPath (Join-Path $root 'src') -Filter '*.cs' |
 & $compiler /nologo /target:library /platform:anycpu /optimize+ '/r:System.Windows.Forms.dll' '/r:System.Drawing.dll' '/r:System.Web.Extensions.dll' '/r:Microsoft.CSharp.dll' ("/out:" + (Join-Path $bin 'OpenSlideCharts.dll')) $sources
 if ($LASTEXITCODE -ne 0) { throw 'Add-in build failed.' }
 if ($Test) {
-    & $compiler /nologo /target:exe ("/out:" + (Join-Path $bin 'CoreTests.exe')) (Join-Path $root 'src\ChartCore.cs') (Join-Path $root 'src\SeriesChart.cs') (Join-Path $root 'tests\CoreTests.cs')
+    & $compiler /nologo /target:exe ("/out:" + (Join-Path $bin 'CoreTests.exe')) (Join-Path $root 'src\ChartCore.cs') (Join-Path $root 'src\ChartAppearance.cs') (Join-Path $root 'src\SeriesChart.cs') (Join-Path $root 'tests\CoreTests.cs')
     if ($LASTEXITCODE -ne 0) { throw 'Test build failed.' }
     & (Join-Path $bin 'CoreTests.exe')
     if ($LASTEXITCODE -ne 0) { throw 'Core tests failed.' }

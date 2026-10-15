@@ -73,6 +73,61 @@ MODEL = b'''<?xml version="1.0" encoding="UTF-8"?><root reqver="1"><version val=
 <CVariableSource id="7"><m_varval type="1" val="1.25E+01"/></CVariableSource></root>'''
 
 
+class AppearanceMetadataTests(unittest.TestCase):
+    def test_group_transform_shape_flags_and_body_properties_retained(self):
+        xml=('''<p:sld xmlns:p="%s" xmlns:a="%s"><p:cSld><p:spTree><p:grpSp>
+          <p:nvGrpSpPr><p:cNvPr id="2" name="Group"/></p:nvGrpSpPr><p:grpSpPr><a:xfrm rot="60000"><a:off x="100" y="200"/><a:ext cx="300" cy="400"/><a:chOff x="0" y="0"/><a:chExt cx="300" cy="400"/></a:xfrm></p:grpSpPr>
+          <p:sp><p:nvSpPr><p:cNvPr id="3" name="Text"/></p:nvSpPr><p:spPr><a:xfrm flipH="1"><a:off x="10" y="20"/><a:ext cx="30" cy="40"/></a:xfrm></p:spPr>
+          <p:txBody><a:bodyPr anchor="ctr" lIns="0" tIns="0" rIns="0" bIns="0"/><a:p><a:r><a:t>Invented</a:t></a:r></a:p></p:txBody></p:sp>
+          </p:grpSp></p:spTree></p:cSld></p:sld>'''%(reader.P,reader.A)).encode()
+        result=reader.inspect_bytes(pptx([('ppt/slides/slide1.xml',xml)]))
+        shape=next(s for s in result['shapes'] if s['id']=='3')
+        self.assertEqual(shape['transform_attributes'],{'flipH':'1'})
+        self.assertEqual(shape['parent_group_transforms'][0]['attributes'],{'rot':'60000'})
+        self.assertEqual(shape['parent_group_transforms'][0]['coordinates']['off'],{'x':'100','y':'200'})
+        self.assertEqual(shape['body_properties']['anchor'],'ctr');self.assertEqual(shape['body_properties']['lIns'],'0')
+
+    def test_native_cache_labels_axis_and_gap(self):
+        root=reader.parse_xml(('''<c:chartSpace xmlns:c="%s" xmlns:a="%s"><c:chart><c:plotArea>
+          <c:barChart><c:barDir val="col"/><c:grouping val="stacked"/><c:gapWidth val="60"/><c:overlap val="100"/>
+          <c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>Invented</c:v></c:tx>
+            <c:spPr><a:solidFill><a:srgbClr val="123456"/></a:solidFill></c:spPr>
+            <c:val><c:numLit><c:pt idx="0"><c:v>7.25</c:v></c:pt></c:numLit></c:val>
+            <c:dLbls><c:dLbl><c:idx val="0"/><c:dLblPos val="ctr"/><c:showVal val="1"/><c:numFmt formatCode="0"/>
+              <c:txPr><a:p><a:pPr><a:defRPr sz="1100"><a:latin typeface="Synthetic"/></a:defRPr></a:pPr></a:p></c:txPr>
+            </c:dLbl></c:dLbls></c:ser></c:barChart>
+          <c:valAx><c:scaling><c:min val="0"/><c:max val="8"/></c:scaling><c:tickLblPos val="none"/>
+            <c:spPr><a:ln><a:noFill/></a:ln></c:spPr></c:valAx>
+        </c:plotArea></c:chart></c:chartSpace>'''%(reader.C,reader.A)).encode())
+        result=reader.native_chart_metadata(root,'ppt/charts/chart2.xml')
+        self.assertEqual(result['series'][0]['gap_width'],60)
+        self.assertEqual(result['series'][0]['cache_values'],[{'index':'0','literal':'7.25'}])
+        self.assertEqual(result['series'][0]['labels'][0]['font']['size_points'],11)
+        self.assertEqual(result['axes'][0]['maximum'],8)
+        self.assertTrue(result['axes'][0]['line_hidden']);self.assertFalse(result['has_legend'])
+
+    def test_color_transforms_not_guessed(self):
+        theme={'mapping':{'tx1':'dk1'},'colors':{'dk1':{'kind':'srgbClr','val':'121314','transforms':[]}}}
+        self.assertEqual(reader.theme_color(theme,{'kind':'schemeClr','val':'tx1','transforms':[]}),'#121314')
+        self.assertIsNone(reader.theme_color(theme,{'kind':'schemeClr','val':'tx1','transforms':[{'kind':'tint','val':'20000'}]}))
+
+    def test_effective_run_font_overrides_list_size_preserves_theme_color(self):
+        root=reader.parse_xml(('''<p:sp xmlns:p="%s" xmlns:a="%s"><p:txBody><a:lstStyle><a:lvl1pPr><a:defRPr sz="2600"><a:solidFill><a:schemeClr val="tx1"/></a:solidFill><a:latin typeface="+mn-lt"/></a:defRPr></a:lvl1pPr></a:lstStyle><a:p><a:pPr lvl="0"/><a:fld><a:rPr sz="1200"/><a:t>Synthetic</a:t></a:fld></a:p></p:txBody></p:sp>'''%(reader.P,reader.A)).encode())
+        font=reader.shape_fonts(root)[0]
+        self.assertEqual(font['size_points'],12);self.assertEqual(font['latin'],'+mn-lt');self.assertEqual(font['color']['val'],'tx1')
+
+    def test_labels_follow_owned_model_refs(self):
+        root=reader.parse_xml(MODEL)
+        import xml.etree.ElementTree as ET
+        series=root.find('CSequenceChartDataSeries')
+        ET.SubElement(series,'m_scdserlabel',{'idref':'8'})
+        label=ET.SubElement(root,'CSequenceChartDataSeriesLabel',{'id':'8'})
+        box=ET.SubElement(label,'m_ppttb');ET.SubElement(box,'m_bstrShapeName').text='invented-token'
+        ET.SubElement(box,'m_bPlaced',{'val':'1'})
+        result=reader.model_summary(root)['charts'][0]['presentation_labels']
+        self.assertEqual(len(result),1);self.assertEqual(result[0]['series_index'],0);self.assertEqual(result[0]['token'],'invented-token')
+
+
 class CompoundTests(unittest.TestCase):
     def test_regular_stream(self):
         obj=reader.CompoundFile(cfb(MODEL))

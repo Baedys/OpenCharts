@@ -11,6 +11,8 @@ namespace OpenSlideCharts
         public string WorkbookPath, Worksheet, RangeAddress;
         public List<string> Series = new List<string>();
         public string LayoutMode = "Clustered";
+        public ChartAppearance Appearance;
+        public List<string> ImportWarnings = new List<string>();
     }
     public sealed class ChartRow
     {
@@ -25,6 +27,11 @@ namespace OpenSlideCharts
         public double X, Y, W, H;
         public int Color;
         public double FontSize;
+        public string FontName;
+        public double LineWidth;
+        public string VerticalAlignment;
+        public double? MarginLeft, MarginRight;
+        public bool NoWrap;
     }
     public sealed class Layout
     {
@@ -61,18 +68,28 @@ namespace OpenSlideCharts
             Validate(spec, width, height);
             string kind = spec.Kind.ToLowerInvariant();
             Layout result = new Layout();
-            Text(result, spec.Title ?? spec.Kind, 14, 8, width - 28, 28, 20, Ink, "left");
+            if (spec.Appearance == null || spec.Appearance.ShowTitle)
+                Text(result, spec.Title ?? spec.Kind, 14, 8, width - 28, 28, 20, Ink, "left");
             if (spec.Series != null && spec.Series.Count > 0) MultiSeries(result, spec, width, height);
             else if (kind == "mekko") Mekko(result, spec, width, height);
             else if (kind == "gantt" || kind == "bar") Horizontal(result, spec, width, height, kind == "gantt");
             else Vertical(result, spec, width, height, kind);
+            foreach (Primitive item in result.Items)
+            {
+                if (!Finite(item.X) || !Finite(item.Y) || !Finite(item.W) || !Finite(item.H) ||
+                    item.X < -.00001 || item.Y < -.00001 || item.X > width + .00001 || item.Y > height + .00001 ||
+                    item.X + item.W < -.00001 || item.Y + item.H < -.00001 || item.X + item.W > width + .00001 || item.Y + item.H > height + .00001 ||
+                    (item.Kind != "line" && (item.W < 0 || item.H < 0)))
+                    throw new ArgumentException("Chart geometry exceeds its frame. Leave room around PlotRect for labels and ticks.");
+            }
             return result;
         }
 
         private static void Validate(ChartSpec spec, double width, double height)
         {
             if (spec == null) throw new ArgumentNullException("spec");
-            if (!Finite(width) || !Finite(height) || width < 320 || height < 240 || width > 100000 || height > 100000)
+            bool observedPlot = spec.Appearance != null && spec.Appearance.PlotRect != null;
+            if (!Finite(width) || !Finite(height) || width < (observedPlot ? 1 : 320) || height < (observedPlot ? 1 : 240) || width > 100000 || height > 100000)
                 throw new ArgumentOutOfRangeException("width", "Chart dimensions must be finite, from 320 x 240 to 100000 x 100000 points.");
             string kind = (spec.Kind ?? "").ToLowerInvariant();
             if (kind != "waterfall" && kind != "column" && kind != "bar" && kind != "line" && kind != "mekko" && kind != "gantt")

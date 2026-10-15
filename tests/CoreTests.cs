@@ -14,7 +14,7 @@ public static class CoreTests
                 Bounds(ChartEngine.Build(ChartSamples.Create(kind), 640, 360), 640, 360);
                 Bounds(ChartEngine.Build(ChartSamples.Create(kind), 320, 240), 320, 240);
             }
-            Waterfall(); SignedColumn(); Mekko(); Gantt(); Extremes(); Validation(); Series();
+            Waterfall(); SignedColumn(); Mekko(); Gantt(); Extremes(); Validation(); Series(); Appearance();
             Console.WriteLine("PASS: " + assertions + " assertions"); return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex.ToString()); return 1; }
@@ -140,6 +140,54 @@ public static class CoreTests
         Reject(delegate { ChartEngine.Build(mismatch, 640, 360); });
         var overflow = Matrix("Column", "Stacked"); overflow.Rows[0].Values = new List<double?> { Double.MaxValue, Double.MaxValue, null };
         Reject(delegate { ChartEngine.Build(overflow, 640, 360); });
+    }
+    private static void Appearance()
+    {
+        var spec = Matrix("Column", "Stacked");
+        spec.Rows[0].Values = new List<double?> { 10, 20, 30 };
+        spec.Rows[1].Values = new List<double?> { 15, 25, 35 };
+        spec.Appearance = new ChartAppearance {
+            ShowTitle = false, ShowLegend = false, ShowValueAxis = false, ShowGridlines = false,
+            ShowTotals = true, SeriesLabelsAtFirstStack = true,
+            SeriesColors = new List<string> { "#102030", "#405060", "#708090" },
+            DisplayOrder = new List<int> { 2, 1, 0 },
+            PlotRect = new ChartRectangle { X = .15, Y = .1, Width = .8, Height = .8 },
+            Minimum = 0, Maximum = 75, GapRatio = .8, ValueFontSize = 14, CategoryFontSize = 14,
+            ValueFormat = "#,##0;\"-\"#,##0", TotalFormat = "0", AxisLineWidth = .75
+        };
+        Layout layout = ChartEngine.Build(spec, 600, 300);
+        Bounds(layout, 600, 300);
+        List<Primitive> bars = Rects(layout);
+        Check(bars.Count == 6 && bars[0].Color == 0x908070, "Observed order and RGB-to-OLE conversion");
+        Near(bars[0].H, 96); Near(bars[0].Y + bars[0].H, 270);
+        Near(bars[0].W, 240 / 1.8);
+        int lines = 0, totals = 0, names = 0;
+        foreach (Primitive p in layout.Items)
+        {
+            if (p.Kind == "line") { lines++; Near(p.LineWidth, .75); }
+            if (p.Text == "60" || p.Text == "75") totals++;
+            if (p.Text == "A" || p.Text == "B" || p.Text == "C") names++;
+            Check(p.Text != "Matrix", "Hidden imported title must stay hidden");
+        }
+        Check(lines == 1 && totals == 2 && names == 3, "Observed baseline, totals and series labels");
+        Check(ChartAppearance.Format(3.5, "0", 0) == "4" && ChartAppearance.Format(-2.5, "0", 0) == "-3", "Integer labels round away from zero");
+        spec.Appearance.SourceFrame = new ChartRectangle { Width = 300, Height = 150 };
+        spec.Appearance.ValueLabelOffsets.Add(new ChartLabelOffset { SeriesIndex = 0, CategoryIndex = 0, X = 2, Y = -1 });
+        Layout shifted = ChartEngine.Build(spec, 600, 300);
+        for (int i = 0; i < layout.Items.Count; i++)
+            if (layout.Items[i].Kind == "text" && layout.Items[i].Text == "10")
+            { Near(shifted.Items[i].X - layout.Items[i].X, 4); Near(shifted.Items[i].Y - layout.Items[i].Y, -2); }
+        spec.Appearance.ValueLabelOffsets.Add(new ChartLabelOffset { SeriesIndex = 0, CategoryIndex = 0 });
+        Reject(delegate { ChartEngine.Build(spec, 600, 300); });
+        spec.Appearance.ValueLabelOffsets.Clear();
+        spec.Appearance.DisplayOrder = new List<int> { 0, 0, 1 };
+        Reject(delegate { ChartEngine.Build(spec, 600, 300); });
+        spec.Appearance.DisplayOrder = new List<int> { 0, 1, 2 }; spec.Appearance.SeriesColors[0] = "blue";
+        Reject(delegate { ChartEngine.Build(spec, 600, 300); });
+        spec.Appearance.SeriesColors[0] = "#000000"; spec.Appearance.PlotRect.Width = 2;
+        Reject(delegate { ChartEngine.Build(spec, 600, 300); });
+        spec.Appearance.PlotRect = new ChartRectangle { X = 0, Y = 0, Width = 1, Height = 1 };
+        Reject(delegate { ChartEngine.Build(spec, 600, 300); });
     }
     private static void Bounds(Layout l, double w, double h)
     {

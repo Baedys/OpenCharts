@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
@@ -12,11 +12,15 @@ namespace OpenSlideCharts
         private readonly TextBox title = new TextBox();
         private readonly DataGridView grid = new DataGridView();
         private readonly ChartSpec source;
+        private readonly double renderWidth, renderHeight;
         public ChartSpec Spec { get; private set; }
 
-        public SeriesEditor(ChartSpec initial)
+        public SeriesEditor(ChartSpec initial, double? width = null, double? height = null)
         {
             source = ChartStorage.Clone(initial);
+            ChartRectangle frame = source.Appearance == null ? null : source.Appearance.SourceFrame;
+            renderWidth = width ?? (frame == null ? 720 : frame.Width);
+            renderHeight = height ?? (frame == null ? 400 : frame.Height);
             Text = "OpenSlideCharts — Séries";
             StartPosition = FormStartPosition.CenterScreen;
             AutoScaleMode = AutoScaleMode.Dpi;
@@ -42,7 +46,13 @@ namespace OpenSlideCharts
             kind.Dock = mode.Dock = title.Dock = DockStyle.Fill;
             title.Text = initial.Title ?? "";
             fields.Controls.Add(kind, 0, 0); fields.Controls.Add(mode, 1, 0); fields.Controls.Add(title, 2, 0); root.Controls.Add(fields, 0, 0);
-            root.Controls.Add(new Label { Dock = DockStyle.Fill, Text = "Cellule vide = donnée absente. Collage : première ligne = noms de séries, première colonne = catégories.\nClustered : groupé ; Stacked : empilé ; Percent : empilé à 100 %. Double-clic sur un en-tête pour renommer." }, 0, 1);
+            string instructions = "Cellule vide = donnée absente. Collage : première ligne = noms de séries, première colonne = catégories.\nClustered : groupé ; Stacked : empilé ; Percent : empilé à 100 %. Double-clic sur un en-tête pour renommer.";
+            if (source.ImportWarnings != null && source.ImportWarnings.Count > 0)
+            {
+                root.RowStyles[1].Height = 85;
+                instructions += "\nImport partiel : " + String.Join(" ; ", source.ImportWarnings.ToArray());
+            }
+            root.Controls.Add(new Label { Dock = DockStyle.Fill, Text = instructions }, 0, 1);
             grid.Dock = DockStyle.Fill; grid.BackgroundColor = Color.White;
             grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
             grid.AllowUserToOrderColumns = false;
@@ -74,7 +84,7 @@ namespace OpenSlideCharts
             }));
             var apply = MakeButton("Appliquer", delegate
             {
-                try { ChartSpec candidate = ReadMatrix(); ChartEngine.Build(candidate, 720, 400); Spec = candidate; DialogResult = DialogResult.OK; Close(); }
+                try { ChartSpec candidate = ReadMatrix(); ValidateCandidate(candidate); Spec = candidate; DialogResult = DialogResult.OK; Close(); }
                 catch (Exception ex) { Error(ex.Message); }
             });
             actions.Controls.Add(apply);
@@ -84,16 +94,23 @@ namespace OpenSlideCharts
         }
         private static Button MakeButton(string label, EventHandler action)
         { var b = new Button { Text = label, AutoSize = true, Height = 30 }; b.Click += action; return b; }
-        private void AddSeries(string name)
+        private void ValidateCandidate(ChartSpec candidate)
+        {
+            if ((candidate.Appearance == null || candidate.Appearance.PlotRect == null) && (renderWidth < 320 || renderHeight < 240))
+                throw new ArgumentException("Ce changement nécessite un cadre d'au moins 320 × 240 points. Conservez le type actuel, puis agrandissez le groupe dans PowerPoint avant de le modifier.");
+            ChartEngine.Build(candidate, renderWidth, renderHeight);
+        }
+        private void AddSeries(string name, int sourceIndex = -1)
         {
             int index = grid.Columns.Add("S_" + Guid.NewGuid().ToString("N"), name);
             grid.Columns[index].SortMode = DataGridViewColumnSortMode.NotSortable;
+            grid.Columns[index].Tag = sourceIndex;
         }
         private void LoadMatrix(ChartSpec spec)
         {
             grid.CancelEdit(); grid.Rows.Clear(); grid.Columns.Clear();
             grid.Columns.Add("Category", "Catégorie"); grid.Columns[0].SortMode = DataGridViewColumnSortMode.NotSortable;
-            foreach (string name in spec.Series) AddSeries(name);
+            for (int s = 0; s < spec.Series.Count; s++) AddSeries(spec.Series[s], s < source.Series.Count ? s : -1);
             foreach (ChartRow row in spec.Rows)
             {
                 var cells = new object[spec.Series.Count + 1]; cells[0] = row.Label;
@@ -108,6 +125,33 @@ namespace OpenSlideCharts
             result.Kind = (string)kind.SelectedItem; result.LayoutMode = (string)mode.SelectedItem; result.Title = title.Text;
             result.Series.Clear(); result.Rows.Clear();
             for (int s = 1; s < grid.Columns.Count; s++) result.Series.Add(grid.Columns[s].HeaderText);
+            if (result.Appearance != null)
+            {
+                var oldColors = result.Appearance.SeriesColors;
+                var oldOrder = result.Appearance.DisplayOrder;
+                var newIndices = new Dictionary<int, int>();
+                result.Appearance.SeriesColors = new List<string>();
+                result.Appearance.DisplayOrder = new List<int>();
+                for (int s = 1; s < grid.Columns.Count; s++)
+                {
+                    int old = grid.Columns[s].Tag is int ? (int)grid.Columns[s].Tag : -1;
+                    if (old >= 0) newIndices[old] = s - 1;
+                    if (oldColors != null && oldColors.Count > 0)
+                        result.Appearance.SeriesColors.Add(old >= 0 && old < oldColors.Count ? oldColors[old] : "#808080");
+                }
+                if (oldOrder != null && oldOrder.Count > 0)
+                {
+                    foreach (int old in oldOrder) if (newIndices.ContainsKey(old)) result.Appearance.DisplayOrder.Add(newIndices[old]);
+                    for (int s = 0; s < result.Series.Count; s++) if (!result.Appearance.DisplayOrder.Contains(s)) result.Appearance.DisplayOrder.Add(s);
+                }
+                if (result.Appearance.ValueLabelOffsets != null)
+                {
+                    var retained = new List<ChartLabelOffset>();
+                    foreach (ChartLabelOffset offset in result.Appearance.ValueLabelOffsets)
+                        if (newIndices.ContainsKey(offset.SeriesIndex)) { offset.SeriesIndex = newIndices[offset.SeriesIndex]; retained.Add(offset); }
+                    result.Appearance.ValueLabelOffsets = retained;
+                }
+            }
             foreach (DataGridViewRow row in grid.Rows)
             {
                 if (row.IsNewRow) continue;
@@ -119,26 +163,53 @@ namespace OpenSlideCharts
                 }
                 result.Rows.Add(item);
             }
+            if (result.Appearance != null && ChartStorage.Serialize(result) != ChartStorage.Serialize(source))
+            {
+                // Bounds in exported OOXML describe the saved snapshot. They do
+                // not establish whether the original user selected fixed bounds.
+                // Recompute after numeric edits instead of freezing stale limits.
+                bool changed = result.Rows.Count != source.Rows.Count || result.Series.Count != source.Series.Count;
+                for (int r = 0; !changed && r < result.Rows.Count; r++)
+                {
+                    if (result.Rows[r].Values.Count != source.Rows[r].Values.Count) { changed = true; break; }
+                    for (int s = 0; s < result.Rows[r].Values.Count; s++) if (result.Rows[r].Values[s] != source.Rows[r].Values[s]) { changed = true; break; }
+                }
+                if (changed) { result.Appearance.Minimum = null; result.Appearance.Maximum = null; }
+                if (result.Rows.Count != source.Rows.Count) result.Appearance.ValueLabelOffsets = new List<ChartLabelOffset>();
+            }
+            if (result.Appearance != null && (!String.Equals(result.Kind, source.Kind, StringComparison.OrdinalIgnoreCase) || result.LayoutMode != source.LayoutMode))
+            {
+                // The observed plot and side labels belong to the original chart
+                // topology. Preserve colors/fonts, but lay out the new type anew.
+                result.Appearance.PlotRect = null;
+                result.Appearance.Minimum = null; result.Appearance.Maximum = null;
+                result.Appearance.SeriesLabelsAtFirstStack = false;
+                result.Appearance.ShowTotals = false; result.Appearance.ShowLegend = true;
+                result.Appearance.ValueLabelOffsets = new List<ChartLabelOffset>();
+            }
             return result;
         }
         private void Paste()
         {
-            try
-            {
-                List<List<string>> table = ChartEditor.ParseTsv(Clipboard.GetText());
-                if (table.Count < 2 || table[0].Count < 2 || table[0].Count > 9) throw new ArgumentException("En-tête requis : Catégorie puis un à huit noms de séries.");
-                var candidate = new ChartSpec { Kind = (string)kind.SelectedItem, LayoutMode = (string)mode.SelectedItem, Title = title.Text };
-                for (int s = 1; s < table[0].Count; s++) candidate.Series.Add(table[0][s]);
-                for (int r = 1; r < table.Count; r++)
-                {
-                    if (table[r].Count != table[0].Count) throw new ArgumentException("Ligne " + (r + 1) + " : nombre de colonnes différent de l'en-tête.");
-                    var row = new ChartRow { Label = table[r][0] };
-                    for (int s = 1; s < table[r].Count; s++) row.Values.Add(String.IsNullOrWhiteSpace(table[r][s]) ? (double?)null : ChartEditor.Number(table[r][s], "Ligne " + (r + 1)));
-                    candidate.Rows.Add(row);
-                }
-                ChartEngine.Build(candidate, 720, 400); LoadMatrix(candidate);
-            }
+            try { PasteMatrix(Clipboard.GetText()); }
             catch (Exception ex) { Error(ex.Message); }
+        }
+        private void PasteMatrix(string text)
+        {
+            List<List<string>> table = ChartEditor.ParseTsv(text);
+            if (table.Count < 2 || table[0].Count < 2 || table[0].Count > 9) throw new ArgumentException("En-tête requis : Catégorie puis un à huit noms de séries.");
+            var candidate = new ChartSpec { Kind = (string)kind.SelectedItem, LayoutMode = (string)mode.SelectedItem, Title = title.Text };
+            for (int s = 1; s < table[0].Count; s++) candidate.Series.Add(table[0][s]);
+            for (int r = 1; r < table.Count; r++)
+            {
+                if (table[r].Count != table[0].Count) throw new ArgumentException("Ligne " + (r + 1) + " : nombre de colonnes différent de l'en-tête.");
+                var row = new ChartRow { Label = table[r][0] };
+                for (int s = 1; s < table[r].Count; s++) row.Values.Add(String.IsNullOrWhiteSpace(table[r][s]) ? (double?)null : ChartEditor.Number(table[r][s], "Ligne " + (r + 1)));
+                candidate.Rows.Add(row);
+            }
+            // Paste validates the data before changing the grid. ReadMatrix merges
+            // retained appearance later; Apply validates that final model at its real size.
+            ChartEngine.Build(candidate, 720, 400); LoadMatrix(candidate);
         }
         private string AskName(string initial)
         {

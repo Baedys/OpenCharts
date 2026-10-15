@@ -3,7 +3,8 @@
 
 Input PPTX or inspect_thinkcell.py JSON stays unchanged. Explicit chart, kind and
 layout selection required: private type codes are never guessed. This converts
-supported data only; it does not preserve think-cell layout, style or editability.
+supported data and a verified subset of native stacked-column appearance. It
+does not preserve private editability or guarantee visual round-trip fidelity.
 """
 import argparse
 import json
@@ -11,7 +12,212 @@ import math
 import pathlib
 import sys
 
-from inspect_thinkcell import InspectionError, MAX_FILE, inspect_bytes
+from inspect_thinkcell import InspectionError, MAX_FILE, inspect_bytes, theme_color
+
+
+def frame_points(link):
+    def neutral_flags(attributes):
+        if attributes is None: return False
+        try: rotation=int(attributes.get('rot','0'))
+        except (ValueError,TypeError): return False
+        return rotation%21600000==0 and all(attributes.get(k) in (None,'0','false') for k in ['flipH','flipV'])
+    if not neutral_flags(link.get('transform_attributes',{})):
+        raise InspectionError('Appearance: rotated/flipped shape transform unsupported')
+    for group in link.get('parent_group_transforms',[]) or []:
+        if not neutral_flags(group.get('attributes')):
+            raise InspectionError('Appearance: nonneutral parent group transform unsupported')
+        coords=group.get('coordinates') or {}
+        try:
+            same=all(int(coords[a][k])==int(coords[b][k]) for a,b,keys in
+                [('off','chOff',['x','y']),('ext','chExt',['cx','cy'])] for k in keys)
+            positive=all(int(coords['ext'][k])>0 for k in ['cx','cy'])
+        except (KeyError,TypeError,ValueError): same=positive=False
+        if not same or not positive:
+            raise InspectionError('Appearance: parent group translation/scaling requires composition')
+    try:
+        t=link['transform_emu']
+        frame={k:float(t[group][name])/12700 for k,group,name in
+               [('X','off','x'),('Y','off','y'),('Width','ext','cx'),('Height','ext','cy')]}
+    except (KeyError,TypeError,ValueError,OverflowError) as exc:
+        raise InspectionError('Appearance: incomplete shape bounds') from exc
+    if not all(math.isfinite(v) for v in frame.values()) or frame['Width']<=0 or frame['Height']<=0:
+        raise InspectionError('Appearance: invalid shape bounds')
+    return frame
+
+
+def observed_appearance(chart, names, rows, kind, layout, warnings=None):
+    """Strict initial appearance subset, checked against data and label geometry.
+
+    Every inferred label placement must agree with its linked source shape.
+    Unknown style is reported to the caller; no private enum guessed.
+    """
+    warnings=warnings if warnings is not None else []
+    links=chart.get('resolved_shape_links',[])
+    if not links: return None
+    if len(links)!=1 or len(links[0].get('native_charts',[]))!=1:
+        raise InspectionError('Appearance: ambiguous native chart relationship')
+    native=links[0]['native_charts'][0]
+    if not native or 'series' not in native: return None
+    if kind!='Column' or layout!='Stacked' or native.get('types')!=['barChart'] or native.get('grouping')!=['stacked'] or native.get('bar_direction')!=['col']:
+        raise InspectionError('Appearance: only observed stacked-column layout supported')
+    if any(v<0 for row in rows for v in row['Values']):
+        raise InspectionError('Appearance: signed stacked-label geometry not verified')
+    if native['has_title'] or native['has_legend']:
+        raise InspectionError('Appearance: native title/legend geometry not supported')
+    ns=native['series']
+    if len(ns)!=len(names): raise InspectionError('Appearance: native/model series count mismatch')
+    if {s.get('order') for s in ns}!={str(i) for i in range(len(ns))}:
+        raise InspectionError('Appearance: native series order invalid')
+    ns=sorted(ns,key=lambda s:int(s['order']))
+    frame=frame_points(links[0]);manual_offsets=[];value_offsets=[]
+    order=[]; colors=[None]*len(names); formats=set(); fonts=set(); sizes=set()
+    for series in ns:
+        if series.get('point_overrides'):
+            raise InspectionError('Appearance: per-point styles unsupported')
+        cache=series['cache_values']
+        if [x['index'] for x in cache]!=[str(i) for i in range(len(rows))]:
+            raise InspectionError('Appearance: incomplete native cache indices')
+        try: values=[float(x['literal']) for x in cache]
+        except (ValueError,TypeError,OverflowError) as exc:
+            raise InspectionError('Appearance: native numeric cache malformed') from exc
+        matches=[i for i,name in enumerate(names) if (series['title'] is None or series['title']==name) and
+                 all(math.isfinite(v) and math.isclose(v,row['Values'][i],rel_tol=1e-12,abs_tol=1e-12) for v,row in zip(values,rows))]
+        if len(matches)!=1 or matches[0] in order:
+            raise InspectionError('Appearance: native/model series identity ambiguous')
+        si=matches[0];order.append(si);colors[si]=series.get('resolved_color')
+        if not colors[si]: raise InspectionError('Appearance: series color cannot be resolved exactly')
+        labels=series['labels']
+        if len(labels)!=len(rows) or {l['index'] for l in labels}!={str(i) for i in range(len(rows))}:
+            raise InspectionError('Appearance: partial value labels unsupported')
+        for label in labels:
+            font=label.get('font') or {}
+            if any(font.get(k) not in (None,'0','false') for k in ['bold','italic']):
+                raise InspectionError('Appearance: bold/italic value font unsupported')
+            if label['show_value']!='1' or label['position']!='ctr' or font.get('resolved_color')!='#FFFFFF':
+                raise InspectionError('Appearance: only centered white value labels supported')
+            formats.add(label['format']);fonts.add(font.get('resolved_name'));sizes.add(font.get('size_points'))
+            manual=label.get('manual_layout') or {}
+            if manual:
+                if set(manual)-{'x','y','xMode','yMode'} or any(manual.get(k) not in (None,'factor') for k in ['xMode','yMode']):
+                    raise InspectionError('Appearance: unsupported value-label manual layout mode/size')
+                try: x=float(manual.get('x',0));y=float(manual.get('y',0))
+                except (ValueError,TypeError,OverflowError) as exc: raise InspectionError('Appearance: invalid value-label manual offset') from exc
+                if not math.isfinite(x) or not math.isfinite(y): raise InspectionError('Appearance: nonfinite value-label manual offset')
+                if x or y:
+                    # MS-OE376 ST_LayoutMode: explicit factor is displacement
+                    # from default position, relative to chart width/height.
+                    # Missing modes matched explicit factor pixel-for-pixel in
+                    # Office 16.0.20430.20146 on the checked stacked-column
+                    # corpus. Keep this empirical assumption visible.
+                    if (x and manual.get('xMode') is None) or (y and manual.get('yMode') is None):
+                        manual_offsets.append((x,y))
+                    value_offsets.append({'SeriesIndex':si,'CategoryIndex':int(label['index']),
+                                          'X':x*frame['Width'],'Y':y*frame['Height']})
+    if len(formats)!=1 or next(iter(formats)) not in ('#,##0;"-"#,##0','#,##0','0') or len(fonts)!=1 or None in fonts or len(sizes)!=1 or None in sizes:
+        raise InspectionError('Appearance: nonuniform or unsupported number/font formatting')
+    if any(not isinstance(s,(int,float)) or not math.isfinite(s) or not 2<=s<=96 for s in sizes):
+        raise InspectionError('Appearance: value font size outside renderer limits')
+    axes=[a for a in native['axes'] if a['kind']=='valAx']
+    if len(axes)!=1: raise InspectionError('Appearance: multiple/missing value axes')
+    axis=axes[0]
+    if axis['orientation']!='minMax' or axis['minimum']!=0 or axis['maximum'] is None or axis['maximum']<=0:
+        raise InspectionError('Appearance: unsupported native scale')
+    if axis['tick_labels']!='none' or not axis['line_hidden'] or (axis['major_gridlines_present'] and not axis['major_gridlines_hidden']):
+        raise InspectionError('Appearance: visible value-axis geometry unsupported')
+    manual=native.get('manual_plot_layout') or {}
+    if manual.get('layoutTarget')!='inner' or manual.get('xMode')!='edge' or manual.get('yMode')!='edge':
+        raise InspectionError('Appearance: unsupported manual plot coordinate mode')
+    try: fractions={k:float(manual[source]) for k,source in [('X','x'),('Y','y'),('Width','w'),('Height','h')]}
+    except (ValueError,TypeError,KeyError,OverflowError) as exc: raise InspectionError('Appearance: missing manual plot bounds') from exc
+    if not all(math.isfinite(v) for v in fractions.values()) or fractions['Width']<=0 or fractions['Height']<=0 or fractions['X']<0 or fractions['Y']<0 or fractions['X']+fractions['Width']>1.000001 or fractions['Y']+fractions['Height']>1.000001:
+        raise InspectionError('Appearance: invalid manual plot bounds')
+    plot={'X':frame['X']+fractions['X']*frame['Width'],'Y':frame['Y']+fractions['Y']*frame['Height'],
+          'Width':fractions['Width']*frame['Width'],'Height':fractions['Height']*frame['Height']}
+    gaps={s['gap_width'] for s in ns};overlaps={s['overlap'] for s in ns}
+    if len(gaps)!=1 or None in gaps or not 0<=next(iter(gaps))<=500 or len(overlaps)!=1 or overlaps!={100.0}:
+        raise InspectionError('Appearance: inconsistent gaps/overlap')
+    step=plot['Width']/len(rows);bar_width=step/(1+next(iter(gaps))/100)
+    linked=[]; text_colors=set();role_fonts={role:set() for role in ['series','category','total']}; role_indices={role:set() for role in role_fonts}
+    role_gaps={role:[] for role in role_fonts};role_heights={role:[] for role in role_fonts}
+    baseline=plot['Y']+plot['Height'];scale=plot['Height']/axis['maximum']
+    for label in chart.get('presentation_labels',[]):
+        if label['placed']!='1': continue
+        role=label['role'];targets=label.get('resolved_shape_links',[])
+        if role not in role_indices or len(targets)!=1 or targets[0]['slide_part']!=links[0]['slide_part']:
+            raise InspectionError('Appearance: unresolved or ambiguous linked text label')
+        bounds=frame_points(targets[0]);text=targets[0]['text']
+        try: size=float(label['font_size'])
+        except (TypeError,ValueError,OverflowError) as exc: raise InspectionError('Appearance: invalid linked label font') from exc
+        if not math.isfinite(size) or not 2<=size<=96: raise InspectionError('Appearance: invalid linked label font')
+        for f in targets[0].get('text_fonts',[]):
+            if any(f.get(k) not in (None,'0','false') for k in ['bold','italic']):
+                raise InspectionError('Appearance: bold/italic linked text font unsupported')
+            if f.get('size_points') is not None and f['size_points']!=size:
+                raise InspectionError('Appearance: model/native label font mismatch')
+            color=theme_color(native.get('theme',{}),f.get('color'))
+            if color is None: raise InspectionError('Appearance: linked text color unresolved')
+            text_colors.add(color)
+            font_name=f.get('latin')
+            font_name={'+mn-lt':native.get('theme',{}).get('fonts',{}).get('minorFont'),
+                       '+mj-lt':native.get('theme',{}).get('fonts',{}).get('majorFont')}.get(font_name,font_name)
+            if font_name not in fonts: raise InspectionError('Appearance: linked text font differs from value labels')
+        role_fonts[role].add(size)
+        ci=label.get('category_index');si=label.get('series_index')
+        role_index=si if role=='series' else ci
+        if not isinstance(role_index,int) or isinstance(role_index,bool) or role_index in role_indices[role]:
+            raise InspectionError('Appearance: duplicated/invalid '+role+' label index')
+        role_indices[role].add(role_index);role_heights[role].append(bounds['Height'])
+        center_x=bounds['X']+bounds['Width']/2;center_y=bounds['Y']+bounds['Height']/2
+        if role=='series':
+            if not isinstance(si,int) or not 0<=si<len(names) or text!=names[si]: raise InspectionError('Appearance: series label mismatch')
+            before=sum(rows[0]['Values'][i] for i in order[:order.index(si)])
+            expected=baseline-(before+rows[0]['Values'][si]/2)*scale
+            if abs(center_y-expected)>1 or bounds['X']+bounds['Width']>=plot['X']+plot['Width']/len(rows)/2:
+                raise InspectionError('Appearance: series label is not at first-stack segment center')
+            role_gaps[role].append(plot['X']+(step-bar_width)/2-bounds['X']-bounds['Width'])
+        else:
+            if not isinstance(ci,int) or not 0<=ci<len(rows): raise InspectionError('Appearance: category label index invalid')
+            expected_x=plot['X']+(ci+.5)*plot['Width']/len(rows)
+            if abs(center_x-expected_x)>1: raise InspectionError('Appearance: linked label not centered on category')
+            if role=='category':
+                if text!=rows[ci]['Label'] or not 0<=bounds['Y']-baseline<=size:
+                    raise InspectionError('Appearance: unsupported category label content/position')
+                role_gaps[role].append(bounds['Y']-baseline)
+            else:
+                total=sum(rows[ci]['Values']);top=baseline-total*scale
+                if text!=format(total,'.0f') or not 0<=top-(bounds['Y']+bounds['Height'])<=size:
+                    raise InspectionError('Appearance: total label content/position not verified')
+                role_gaps[role].append(top-bounds['Y']-bounds['Height'])
+        linked.append(bounds)
+    if role_indices!={'series':set(range(len(names))),'category':set(range(len(rows))),'total':set(range(len(rows)))} or any(len(v)!=1 for v in role_fonts.values()):
+        raise InspectionError('Appearance: incomplete or nonuniform associated labels')
+    metrics={}
+    for role,prefix in [('series','Series'),('category','Category'),('total','Total')]:
+        for suffix,values in [('Gap',role_gaps[role]),('Height',role_heights[role])]:
+            if min(values)<0 or max(values)-min(values)>.1:
+                raise InspectionError('Appearance: nonuniform or negative '+role+' label '+suffix.lower())
+            metrics[prefix+'Label'+suffix]=sum(values)/len(values)
+    if len(text_colors)!=1: raise InspectionError('Appearance: linked text colors are not uniform')
+    category_axes=[a for a in native['axes'] if a['kind']=='catAx']
+    if len(category_axes)!=1 or category_axes[0]['line_hidden'] or not category_axes[0].get('resolved_line_color') or category_axes[0].get('line_width_points') is None or not 0<category_axes[0]['line_width_points']<=10:
+        raise InspectionError('Appearance: category baseline style unresolved')
+    all_bounds=[frame]+linked
+    left=min(b['X'] for b in all_bounds);top=min(b['Y'] for b in all_bounds)
+    right=max(b['X']+b['Width'] for b in all_bounds);bottom=max(b['Y']+b['Height'] for b in all_bounds)
+    union={'X':left,'Y':top,'Width':right-left,'Height':bottom-top}
+    if manual_offsets:
+        warnings.append('Appearance subset: absent data-label layout modes interpreted as factor, as observed for the checked stacked-column profile in Office 16.0.20430.20146; behavior outside that profile is not established')
+    return {**metrics,'ValueLabelOffsets':value_offsets,'SeriesColors':colors,'DisplayOrder':order,'ShowTitle':False,'ShowLegend':False,
+        'ShowValueAxis':False,'ShowGridlines':False,'ValueFormat':next(iter(formats)),
+        'ValueDigits':0,'FontName':next(iter(fonts)),'ValueFontSize':next(iter(sizes)),
+        'CategoryFontSize':next(iter(role_fonts['category'])),'SeriesFontSize':next(iter(role_fonts['series'])),
+        'TotalFontSize':next(iter(role_fonts['total'])),'TotalFormat':next(iter(formats)),
+        'ShowTotals':True,'SeriesLabelsAtFirstStack':True,'GapRatio':next(iter(gaps))/100,
+        'TextColor':next(iter(text_colors)),'ValueTextColor':'#FFFFFF',
+        'AxisColor':category_axes[0]['resolved_line_color'],'AxisLineWidth':category_axes[0]['line_width_points'],
+        'OverlapPercent':100,'Minimum':axis['minimum'],'Maximum':axis['maximum'],
+        'SourceFrame':union,'PlotRect':{'X':(plot['X']-left)/union['Width'],'Y':(plot['Y']-top)/union['Height'],
+          'Width':plot['Width']/union['Width'],'Height':plot['Height']/union['Height']}}
 
 
 def chart_records(report):
@@ -122,6 +328,13 @@ def convert_record(record, kind, layout, title=None):
         'LayoutMode':layout,'Series':names,'Rows':rows}
     if not isinstance(result['Title'],str):
         raise InspectionError('Title must be text')
+    try:
+        appearance_warnings=[]
+        appearance=observed_appearance(chart,names,rows,kind,layout,appearance_warnings)
+        if appearance: result['Appearance']=appearance
+        if appearance_warnings: result['ImportWarnings']=appearance_warnings
+    except InspectionError as exc:
+        result['ImportWarnings']=[str(exc)+'; data converted, source appearance not applied']
     return result
 
 
@@ -171,7 +384,8 @@ def main(argv=None):
         else:
             print(serialized)
         if not args.list:
-            print('Data conversion only: original unchanged. Layout/style/annotations/Excel links are not transferred; chosen kind/layout are explicit overrides.',file=sys.stderr)
+            print('Original unchanged. Verified appearance subset transferred when available; private editability, Excel links and unsupported annotations are not transferred.',file=sys.stderr)
+            for warning in result.get('ImportWarnings',[]): print('Warning: '+warning,file=sys.stderr)
         return 0
     except (InspectionError,OSError,KeyError,TypeError,AttributeError) as exc:
         print('Conversion failed: '+str(exc),file=sys.stderr)

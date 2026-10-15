@@ -1,4 +1,4 @@
-# OpenCharts
+﻿# OpenCharts
 
 Complément PowerPoint Windows open source, sous licence MIT. Le complément s'inscrit actuellement sous le nom **OpenSlideCharts**. Objectif de recherche et de développement : reproduire les fonctionnalités et interactions de think-cell. **La parité n'est pas atteinte. Ce dépôt contient un prototype fonctionnel, pas un remplacement complet.**
 
@@ -7,12 +7,13 @@ Complément PowerPoint Windows open source, sous licence MIT. Le complément s'i
 - Ruban PowerPoint avec insertion et modification de graphiques.
 - Six moteurs de géométrie : cascade, colonnes, barres, courbe, Mekko à deux segments et Gantt en jours relatifs.
 - Colonnes/barres groupées, empilées et 100 %, courbes multi-séries ; jusqu'à huit séries avec cellules absentes.
+- Import d'une partie vérifiée de l'apparence des colonnes empilées : palette, ordre, polices, échelle, géométrie et étiquettes liées au modèle.
 - Rendu en groupes de formes et textes PowerPoint ordinaires ; les présentations restent visibles sans complément.
 - Éditeur de données, collage de tableaux Excel et données embarquées dans les groupes.
 - Liaison à une plage Excel enregistrée ; actualisation manuelle de la sélection ou de la présentation.
 - Recréation transactionnelle : une erreur de validation conserve le graphique précédent.
 
-Les limites et écarts sont suivis dans [PARITY.md](PARITY.md). La provenance des observations est décrite dans [RECONSTRUCTION.md](RECONSTRUCTION.md).
+Les limites et écarts sont suivis dans [PARITY.md](PARITY.md). La provenance des observations est décrite dans [RECONSTRUCTION.md](RECONSTRUCTION.md). Les interfaces COM identifiées sont consignées dans [INTEROP.md](INTEROP.md).
 
 ## Compilation et installation
 
@@ -59,15 +60,15 @@ Pour modifier, sélectionner le groupe entier et choisir **Modifier les données
 
 Cette version n'édite pas les objets propriétaires think-cell et ne reproduit pas ses menus contextuels ni son placement automatique. Le moteur ne gère pas encore les secteurs/anneaux, les graphiques combinés, les dates calendaires ou les ruptures d'axe. L'actualisation n'est pas automatique et ne lit pas les modifications Excel non enregistrées.
 
-La réédition régénère les formes ; les personnalisations manuelles et animations des formes internes ne sont pas conservées. Les groupes doivent être sans rotation pour être réédités et mesurer au moins 320 × 240 points. Un groupe dissocié perd sa fonction d'édition structurée.
+La réédition régénère les formes ; les personnalisations manuelles et animations des formes internes ne sont pas conservées. Les groupes doivent être sans rotation pour être réédités. La disposition par défaut exige au moins 320 × 240 points ; une zone de tracé explicite importée permet des cadres plus petits, sous réserve que la géométrie finale reste dans le cadre. Changer le type ou le mode rétablit la disposition standard : agrandir d’abord les petits groupes à au moins 320 × 240 points. L’éditeur valide les dimensions avant de fermer. Un groupe dissocié perd sa fonction d’édition structurée.
 
 ## Validation
 
 `Build.ps1 -Test` exécute les tests numériques et de géométrie du moteur. `tests/OfficeSmoke.cs` vérifie le rendu natif, la persistance PPTX, l'import/actualisation Excel et la conservation d'un graphique en cas d'erreur. Le mode explicite `--renderer-only` exclut la vérification du chargement du ruban ; il ne doit pas être présenté comme validation du complément complet.
 
-Les tests d'intégration nécessitent Office installé et utilisent uniquement des documents synthétiques. Ils ne constituent pas une comparaison avec think-cell. Aucun résultat de parité visuelle n'est actuellement revendiqué.
+Les tests d'intégration distribués nécessitent Office installé et utilisent des documents synthétiques. Des comparaisons privées supplémentaires portent sur un profil de colonnes empilées, décrit dans [RECONSTRUCTION.md](RECONSTRUCTION.md). Elles ne démontrent ni parité visuelle globale ni parité des interactions.
 
-Résultats du premier jalon et limites détaillés dans [VALIDATION.md](VALIDATION.md) : 2 984 assertions moteur, 6 assertions de préservation des données d'éditeur, 37 tests Python et 65 contrôles Office avec le cas d'import optionnel.
+Résultats et limites détaillés dans [VALIDATION.md](VALIDATION.md) : **3 098 assertions moteur, 15 assertions d’éditeur, 58 tests Python et 181 contrôles Office** avec le profil de référence optionnel. Sur ce profil empilé, les bords des neuf segments reconstruits diffèrent au plus d’un pixel à 1440 × 810. Ce résultat limité ne couvre pas toutes les étiquettes ni les interactions.
 
 Après installation, fermer PowerPoint puis lancer `Test-Office.ps1`. Le script démarre PowerPoint normalement avant de piloter les tests : un démarrage Office réservé à l'automatisation peut omettre les compléments utilisateur. Les tests Excel créent leur propre instance. Les callbacks interactifs et Undo/Redo restent à vérifier. L'option `-InputJson chemin.json` ajoute un test de rendu et de persistance d'un graphique converti ; son résultat reste local.
 
@@ -75,6 +76,7 @@ Après installation, fermer PowerPoint puis lancer `Test-Office.ps1`. Le script 
 
 - `src/ChartCore.cs` : modèle et calcul géométrique indépendant d'Office.
 - `src/SeriesChart.cs` : géométrie multi-séries.
+- `src/ChartAppearance.cs` : propriétés d'apparence importée et validation.
 - `src/OfficeAdapter.cs` : formes PowerPoint, persistance et lecture Excel.
 - `src/ChartEditor.cs` : éditeur WinForms.
 - `src/SeriesEditor.cs` : éditeur de matrice.
@@ -97,12 +99,25 @@ python .\tools\convert_thinkcell.py .\source.pptx --chart 1 --kind Column --layo
 
 Le convertisseur accepte aussi `inspection.json` comme entrée. L'indice de graphique commence à 1 ; `--kind` (`Column`, `Bar`, `Line`) et `--layout` (`Clustered`, `Stacked`, `Percent`) sont obligatoires. `Line` exige `Clustered` ; `Percent` exige des valeurs non négatives. Les dépassements numériques des cumuls empilés sont refusés. Ces choix sont explicites : les codes internes think-cell ne sont pas traduits automatiquement. `--title` permet de choisir le titre du graphique produit.
 
-La conversion extrait uniquement les catégories, noms de séries et valeurs numériques observés des modèles `CSequenceChartSE`, dans la limite de 8 séries et 80 catégories. Elle refuse les références cassées, cellules non numériques ou manquantes, totaux `e`, connexions et modèles scatter/bubble. Une cellule vide n'est jamais remplacée silencieusement par zéro. Les styles, annotations, coordonnées, liaisons Excel et règles de disposition ne sont pas transférés. Ce n'est pas un import fidèle ni un éditeur d'objets think-cell ; l'original reste inchangé.
+La conversion extrait les catégories, noms de séries et valeurs numériques observés des modèles `CSequenceChartSE`, dans la limite de 8 séries et 80 catégories. Elle refuse les références cassées, cellules non numériques ou manquantes, totaux `e`, connexions et modèles scatter/bubble. Une cellule vide n'est jamais remplacée silencieusement par zéro.
+
+Pour le profil vérifié de colonnes empilées positives, le JSON peut aussi contenir `Appearance`. Les correspondances sont vérifiées à partir du cache graphique OOXML, des relations de thème et des formes de texte reliées au modèle. Ce profil conserve :
+
+- Couleurs par série, ordre d'empilement, police, tailles et formats numériques pris en charge.
+- Bornes d'axe persistées, absence de titre/légende/axe de valeurs/grille, ligne de base et espacement des colonnes.
+- Catégories sous l'axe, sommes au-dessus des piles et noms de séries au niveau des segments de la première colonne ; hauteurs et espacements mesurés lorsqu'ils sont uniformes.
+- Cadre source en points (`SourceFrame`), zone de tracé normalisée dans ce cadre (`PlotRect`) et décalages individuels des valeurs en points (`ValueLabelOffsets`). Le cadre inclut les étiquettes placées et reliées au graphique ; les textes voisins non reliés sont exclus.
+
+Une apparence ambiguë ou non prise en charge produit `ImportWarnings` et une conversion des données sans `Appearance`. C'est notamment le cas pour les polices grasses/italiques, les identités de séries ambiguës, les étiquettes dupliquées ou incomplètes, les styles par point et les transformations non neutres de formes ou groupes. Les erreurs de données restent bloquantes. Les avertissements figurent aussi dans la sortie de la commande et dans l'éditeur multi-séries.
+
+Les décalages de labels avec mode `factor` explicite sont appliqués. Pour les modes absents, l'interprétation comme `factor` provient d'un test Office sur ce profil ; un avertissement conserve cette limite de preuve. Les bornes d'axe importées reproduisent l'état enregistré, sans déterminer si l'utilisateur original avait choisi une échelle automatique ou fixe.
+
+Les annotations générales, liaisons Excel, contraintes de placement automatique et données d'édition propriétaires ne sont pas transférées. La conversion ne permet pas de réécrire un objet think-cell ni de garantir un aller-retour fidèle ; l'original reste inchangé.
 
 L'inspection distingue les cellules numériques, textuelles, dates et types inconnus. Les classeurs XLSB imbriqués sont inventoriés, pas interprétés. Les limites de taille, chaînes CFB, doublons ZIP et déclarations DTD sont contrôlés ; aucun chemin d'archive n'est extrait sur disque.
 
 ```powershell
-python -m unittest discover -s .\tests -p 'test_*.py' -v
+python -m unittest discover -s .\tests -p 'test_*thinkcell.py' -v
 ```
 
 Ces tests utilisent exclusivement des archives et graphes synthétiques créés par le projet.

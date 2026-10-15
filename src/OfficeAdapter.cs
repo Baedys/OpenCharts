@@ -49,6 +49,15 @@ namespace OpenSlideCharts
 
     public static class OfficeRenderer
     {
+        public static ChartRectangle InsertionFrame(ChartSpec spec, double slideWidth, double slideHeight)
+        {
+            ChartRectangle frame = spec.Appearance == null ? null : spec.Appearance.SourceFrame;
+            if (frame == null) return new ChartRectangle { X = 30, Y = 35, Width = Math.Max(320, slideWidth - 60), Height = Math.Max(240, slideHeight - 70) };
+            spec.Appearance.Validate(spec.Series.Count, spec.Rows.Count);
+            if (frame.X < 0 || frame.Y < 0 || frame.X + frame.Width > slideWidth + .001 || frame.Y + frame.Height > slideHeight + .001)
+                throw new ArgumentException("Le cadre d'origine dépasse cette diapositive. Utilisez une diapositive de mêmes dimensions que la source.");
+            return frame;
+        }
         // Render first, then replace. A failed render leaves the previous chart intact.
         public static object Render(object slideObject, ChartSpec spec, double left, double top, double width, double height)
         {
@@ -73,20 +82,26 @@ namespace OpenSlideCharts
                     {
                         s = slide.Shapes.AddLine((float)(left + p.X), (float)(top + p.Y), (float)(left + p.X + p.W), (float)(top + p.Y + p.H));
                         s.Line.ForeColor.RGB = p.Color;
-                        s.Line.Weight = 1.3f;
+                        s.Line.Weight = (float)(p.LineWidth > 0 ? p.LineWidth : 1.3);
                     }
                     else if (p.Kind == "text")
                     {
                         s = slide.Shapes.AddTextbox(1, (float)(left + p.X), (float)(top + p.Y), (float)Math.Max(1, p.W), (float)Math.Max(1, p.H));
-                        s.TextFrame.MarginLeft = 1f; s.TextFrame.MarginRight = 1f;
+                        s.TextFrame.AutoSize = 0;
+                        s.TextFrame.MarginLeft = (float)(p.MarginLeft ?? 1); s.TextFrame.MarginRight = (float)(p.MarginRight ?? 1);
                         s.TextFrame.MarginTop = 0f; s.TextFrame.MarginBottom = 0f;
-                        s.TextFrame.WordWrap = -1;
+                        s.TextFrame.WordWrap = p.NoWrap ? 0 : -1;
+                        if (p.VerticalAlignment != null) s.TextFrame.VerticalAnchor = p.VerticalAlignment == "bottom" ? 4 : (p.VerticalAlignment == "center" ? 3 : 1);
                         s.TextFrame.AutoSize = 0;
                         s.TextFrame.TextRange.Text = p.Text ?? "";
-                        s.TextFrame.TextRange.Font.Name = "Aptos";
+                        s.TextFrame.TextRange.Font.Name = String.IsNullOrEmpty(p.FontName) ? "Aptos" : p.FontName;
                         s.TextFrame.TextRange.Font.Size = (float)(p.FontSize > 0 ? p.FontSize : 11);
                         s.TextFrame.TextRange.Font.Color.RGB = p.Color;
                         s.TextFrame.TextRange.ParagraphFormat.Alignment = p.Alignment == "right" ? 3 : (p.Alignment == "center" ? 2 : 1);
+                        // Office may resize an empty textbox while changing wrapping or anchors.
+                        // Restore the requested geometry after configuring its text frame.
+                        s.Left = (float)(left + p.X); s.Top = (float)(top + p.Y);
+                        s.Width = (float)Math.Max(1, p.W); s.Height = (float)Math.Max(1, p.H);
                     }
                     else if (p.Kind == "rect" || p.Kind == "ellipse")
                     {

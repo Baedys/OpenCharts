@@ -86,7 +86,7 @@ namespace OpenSlideCharts
             Run(delegate
             {
                 dynamic slide = ActiveSlide(), selected = SelectedChart();
-                ChartSpec edited = EditSpec(ChartStorage.Read((object)selected));
+                ChartSpec edited = EditSpec(ChartStorage.Read((object)selected), (double)selected.Width, (double)selected.Height);
                 if (edited != null) {
                     app.StartNewUndoEntry();
                     dynamic chart = OfficeRenderer.Replace((object)slide, (object)selected, edited);
@@ -94,11 +94,11 @@ namespace OpenSlideCharts
                 }
             });
         }
-        private static ChartSpec EditSpec(ChartSpec source)
+        private static ChartSpec EditSpec(ChartSpec source, double? width = null, double? height = null)
         {
             if (source.Series != null && source.Series.Count > 0)
             {
-                using (var editor = new SeriesEditor(source)) return editor.ShowDialog() == DialogResult.OK ? editor.Spec : null;
+                using (var editor = new SeriesEditor(source, width, height)) return editor.ShowDialog() == DialogResult.OK ? editor.Spec : null;
             }
             using (var editor = new ChartEditor(source)) return editor.ShowDialog() == DialogResult.OK ? editor.Spec : null;
         }
@@ -123,7 +123,6 @@ namespace OpenSlideCharts
                     if (dialog.ShowDialog() != DialogResult.OK) return;
                     if (new FileInfo(dialog.FileName).Length > 1048576) throw new InvalidDataException("Fichier JSON limité à 1 Mio.");
                     ChartSpec spec = new JavaScriptSerializer().Deserialize<ChartSpec>(File.ReadAllText(dialog.FileName));
-                    ChartEngine.Build(spec, 720, 400);
                     InsertSpec(spec);
                 }
             });
@@ -131,12 +130,15 @@ namespace OpenSlideCharts
         private void InsertSpec(ChartSpec initial)
         {
             dynamic slide = ActiveSlide();
-            ChartSpec spec = EditSpec(initial);
-            if (spec == null) return;
-            app.StartNewUndoEntry();
             double w = (double)app.ActivePresentation.PageSetup.SlideWidth;
             double h = (double)app.ActivePresentation.PageSetup.SlideHeight;
-            dynamic chart = OfficeRenderer.Render((object)slide, spec, 30, 35, Math.Max(320, w - 60), Math.Max(240, h - 70));
+            ChartRectangle initialFrame = OfficeRenderer.InsertionFrame(initial, w, h);
+            ChartEngine.Build(initial, initialFrame.Width, initialFrame.Height);
+            ChartSpec spec = EditSpec(initial, initialFrame.Width, initialFrame.Height);
+            if (spec == null) return;
+            app.StartNewUndoEntry();
+            ChartRectangle frame = OfficeRenderer.InsertionFrame(spec, w, h);
+            dynamic chart = OfficeRenderer.Render((object)slide, spec, frame.X, frame.Y, frame.Width, frame.Height);
             chart.Select();
         }
         public void RefreshChart(object control)

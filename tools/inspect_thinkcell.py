@@ -342,6 +342,17 @@ def model_summary(root):
         node = element.find(path)
         return node.get(key) if node is not None else None
 
+    def label_record(owner, path, role, series_index=None, category_index=None):
+        target = ref(owner.find(path))
+        if target is None:
+            return None
+        return {'object_id':target.get('id'),'object_type':target.tag,'role':role,
+            'series_index':series_index,'category_index':category_index,
+            'token':target.findtext('m_ppttb/m_bstrShapeName'),
+            'placed':attr(target,'m_ppttb/m_bPlaced'),
+            'font_name':target.findtext('m_ppttb/m_font/m_bstrNameAscii'),
+            'font_size':attr(target,'m_ppttb/m_font/m_nSize')}
+
     charts = []
     for element in root:
         if element.tag not in ('CSequenceChartSE', 'CScatterChartSE'):
@@ -373,8 +384,21 @@ def model_summary(root):
             'child_storage_name': storage,
             'child_package_stream': storage + '/Package' if storage else None})
         if element.tag == 'CSequenceChartSE':
+            chart['presentation_labels'] = []
+            chart['model_appearance'] = {'font_name':element.findtext('m_font/m_bstrNameAscii'),
+                'font_size':attr(element,'m_font/m_nSize'),'gap_width':attr(element,'m_nGapWidth'),
+                'value_digits':attr(element,'m_precAbsoluteScalar/m_nDecimalDigits17909'),
+                'total_digits':attr(element,'m_precAbsoluteSum/m_nDecimalDigits17909')}
+            axis = ref(element.find('m_daxisPrimaryValue'))
+            if axis is not None:
+                chart['model_appearance']['value_axis'] = {k:attr(axis,k) for k in
+                    ['m_fMinValue','m_fMaxValue','m_fUserScaleUnit','m_eaxisextentMin','m_eaxisextentMax','m_euseraxistype']}
             series = links(table, 'm_cscdser')
             chart['series'] = [{'object_id': s.get('id'), 'label': source(s, 'm_varsrc')} if s is not None else None for s in series]
+            for si,s in enumerate(series):
+                if s is not None:
+                    item = label_record(s,'m_scdserlabel','series',series_index=si)
+                    if item: chart['presentation_labels'].append(item)
             chart['categories'] = []
             for vector in links(table, 'ocol'):
                 if vector is None:
@@ -385,6 +409,13 @@ def model_summary(root):
                     'datasheet_index': attr(vector, 'm_nIndexInDataSheet'),
                     'equals_scalar_ref': attr(vector, 'm_scdscEquals', 'idref'), 'values':[]}
                 scalars = links(vector, 'ocol')
+                ci = len(chart['categories'])
+                item = label_record(vector,'m_scdcatlabel','category',category_index=ci)
+                if item: chart['presentation_labels'].append(item)
+                for group in links(vector,'m_cscdscgrp'):
+                    if group is not None:
+                        item = label_record(group,'m_scdsumlabel','total',category_index=ci)
+                        if item: chart['presentation_labels'].append(item)
                 if len(scalars) != len(series):
                     warnings.append('Scalar/series count mismatch: category ' + vector.get('id','?'))
                 for scalar in scalars:
@@ -433,6 +464,143 @@ def inventory_nested_zip(payload):
         archive.close()
 
 
+def xml_value(element, path, key='val'):
+    node = element.find(path, {'a':A,'c':C,'p':P}) if element is not None else None
+    return node.get(key) if node is not None else None
+
+
+def number_or_none(value):
+    try:
+        number = float(value)
+        return number if math.isfinite(number) else None
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def color_metadata(parent):
+    if parent is None:
+        return None
+    node = next((e for e in parent if local(e.tag) in ('srgbClr','schemeClr','sysClr','prstClr','scrgbClr','hslClr')),None)
+    return {'kind':local(node.tag),**node.attrib,'transforms':[{'kind':local(e.tag),**e.attrib} for e in node]} if node is not None else None
+
+
+def font_metadata(parent):
+    if parent is None:
+        return None
+    return {'size_points':number_or_none(parent.get('sz')) / 100 if number_or_none(parent.get('sz')) is not None else None,
+        'latin':xml_value(parent,'a:latin','typeface'),'color':color_metadata(parent.find('{'+A+'}solidFill')),
+        'bold':parent.get('b'),'italic':parent.get('i')}
+
+
+def shape_fonts(shape):
+    ns={'a':A,'p':P};result=[]
+    for para in shape.findall('p:txBody/a:p',ns):
+        level=xml_value(para,'a:pPr','lvl') or '0'
+        if level not in [str(i) for i in range(9)]: continue
+        base=font_metadata(shape.find('p:txBody/a:lstStyle/a:lvl'+str(int(level)+1)+'pPr/a:defRPr',ns)) or {}
+        default=font_metadata(para.find('a:pPr/a:defRPr',ns)) or {}
+        base.update({k:v for k,v in default.items() if v is not None})
+        for run in para:
+            if local(run.tag) not in ('r','fld'): continue
+            font=dict(base);explicit=font_metadata(run.find('a:rPr',ns)) or {}
+            font.update({k:v for k,v in explicit.items() if v is not None});result.append(font)
+    return result
+
+
+def theme_color(theme, color):
+    if not color or color.get('transforms') or theme.get('override_present'): return None
+    if color['kind']=='schemeClr':
+        key=theme.get('mapping',{}).get(color.get('val'),color.get('val'))
+        target=theme.get('colors',{}).get(key)
+        return theme_color(theme,target) if target and target.get('kind')!='schemeClr' else None
+    raw=color.get('val') if color['kind']=='srgbClr' else color.get('lastClr') if color['kind']=='sysClr' else None
+    return '#'+raw.upper() if raw and len(raw)==6 and all(c in '0123456789abcdefABCDEF' for c in raw) else None
+
+
+def native_chart_metadata(root, name):
+    ns = {'a':A,'c':C}
+    result = {'part':name,'types':[local(e.tag) for e in root.iter() if local(e.tag).endswith('Chart')],
+        'grouping':[e.get('val') for e in root.iter('{'+C+'}grouping')],
+        'bar_direction':[e.get('val') for e in root.iter('{'+C+'}barDir')],
+        'series_count':len(list(root.iter('{'+C+'}ser'))),
+        'has_title':root.find('c:chart/c:title',ns) is not None,
+        'has_legend':root.find('c:chart/c:legend',ns) is not None,'series':[],'axes':[]}
+    manual = root.find('c:chart/c:plotArea/c:layout/c:manualLayout',ns)
+    result['manual_plot_layout'] = {local(e.tag):e.get('val') for e in manual} if manual is not None else None
+    plot = root.find('c:chart/c:plotArea',ns)
+    if plot is None: return result
+    for group in plot:
+        if not local(group.tag).endswith('Chart'): continue
+        for s in group.findall('c:ser',ns):
+            cache = s.find('c:val/c:numRef/c:numCache',ns)
+            if cache is None: cache = s.find('c:val/c:numLit',ns)
+            title = s.find('c:tx/c:strRef/c:strCache/c:pt/c:v',ns)
+            if title is None: title = s.find('c:tx/c:v',ns)
+            labels=[]
+            for dl in s.findall('c:dLbls/c:dLbl',ns):
+                labels.append({'index':xml_value(dl,'c:idx'),'show_value':xml_value(dl,'c:showVal'),
+                    'position':xml_value(dl,'c:dLblPos'),'format':xml_value(dl,'c:numFmt','formatCode'),
+                    'font':font_metadata(dl.find('c:txPr/a:p/a:pPr/a:defRPr',ns)),
+                    'manual_layout':{local(e.tag):e.get('val') for e in dl.findall('c:layout/c:manualLayout/*',ns)}})
+            result['series'].append({'index':xml_value(s,'c:idx'),'order':xml_value(s,'c:order'),
+                'title':title.text if title is not None else None,
+                'color':color_metadata(s.find('c:spPr/a:solidFill',ns)),
+                'cache_values':[{'index':p.get('idx'),'literal':p.findtext('c:v',namespaces=ns)} for p in cache.findall('c:pt',ns)] if cache is not None else [],
+                'point_overrides':len(s.findall('c:dPt',ns)),
+                'labels':labels,'group':local(group.tag),'grouping':xml_value(group,'c:grouping'),
+                'gap_width':number_or_none(xml_value(group,'c:gapWidth')),
+                'overlap':number_or_none(xml_value(group,'c:overlap'))})
+    for ax in plot:
+        if local(ax.tag) not in ('valAx','catAx','dateAx','serAx'): continue
+        result['axes'].append({'kind':local(ax.tag),'id':xml_value(ax,'c:axId'),
+            'deleted':xml_value(ax,'c:delete'),'position':xml_value(ax,'c:axPos'),
+            'tick_labels':xml_value(ax,'c:tickLblPos'),'major_tick':xml_value(ax,'c:majorTickMark'),
+            'minor_tick':xml_value(ax,'c:minorTickMark'),'orientation':xml_value(ax,'c:scaling/c:orientation'),
+            'minimum':number_or_none(xml_value(ax,'c:scaling/c:min')),'maximum':number_or_none(xml_value(ax,'c:scaling/c:max')),
+            'line_hidden':ax.find('c:spPr/a:ln/a:noFill',ns) is not None,
+            'line_color':color_metadata(ax.find('c:spPr/a:ln/a:solidFill',ns)),
+            'line_width_points':number_or_none(xml_value(ax,'c:spPr/a:ln','w')) / 12700 if number_or_none(xml_value(ax,'c:spPr/a:ln','w')) is not None else None,
+            'major_gridlines_present':ax.find('c:majorGridlines',ns) is not None,
+            'major_gridlines_hidden':ax.find('c:majorGridlines/c:spPr/a:ln/a:noFill',ns) is not None})
+    return result
+
+
+def resolve_theme(chart, slide_part, roots, relationships):
+    """Follow package relationships; never assume theme1 belongs to a chart."""
+    by_owner = collections.defaultdict(list)
+    for rel in relationships: by_owner[rel['owner']].append(rel)
+    chain, current = [], slide_part
+    for rel_type in ('slideLayout','slideMaster','theme'):
+        candidates=[r['resolved_target'] for r in by_owner[current] if r.get('Type','').endswith('/'+rel_type) and r.get('resolved_target')]
+        if len(candidates)!=1: return
+        current=candidates[0]; chain.append(current)
+    theme=roots.get(current)
+    if theme is None: return
+    ns={'a':A,'p':P}
+    scheme=theme.find('a:themeElements/a:clrScheme',ns)
+    colors={local(e.tag):color_metadata(e) for e in scheme} if scheme is not None else {}
+    mappings={}
+    for part in [chain[1],chain[0],slide_part]:
+        r=roots.get(part)
+        if r is None: continue
+        for path in ['p:clrMap','p:clrMapOvr/a:overrideClrMapping']:
+            m=r.find(path,ns)
+            if m is not None: mappings.update(m.attrib)
+    fonts={key:xml_value(theme,'a:themeElements/a:fontScheme/a:'+key+'/a:latin','typeface') for key in ['majorFont','minorFont']}
+    # A chart themeOverride cannot safely be merged by this small resolver.
+    overrides=[r for r in by_owner[chart['part']] if r.get('Type','').endswith('/themeOverride')]
+    chart['theme']={'part':current,'colors':colors,'mapping':mappings,'fonts':fonts,'override_present':bool(overrides)}
+    for s in chart['series']:
+        s['resolved_color']=theme_color(chart['theme'],s['color'])
+        for label in s['labels']:
+            font=label.get('font')
+            if font:
+                font['resolved_name']={'+mn-lt':fonts['minorFont'],'+mj-lt':fonts['majorFont']}.get(font.get('latin'),font.get('latin'))
+                font['resolved_color']=theme_color(chart['theme'],font['color'])
+    for axis in chart['axes']:
+        axis['resolved_line_color']=theme_color(chart['theme'],axis['line_color'])
+
+
 def inspect_bytes(payload, filename='<memory>'):
     archive = SafeZip(payload)
     result = {'schema_version':1,'input':{'name':filename,'bytes':len(payload),'sha256':digest(payload)},
@@ -445,12 +613,15 @@ def inspect_bytes(payload, filename='<memory>'):
             'Embedded XLSB data and opaque OLE streams are not decoded.',
             'No Office execution, no documents changed, no extracted assets.']}
     namespaces = set()
+    roots = {}
     try:
         for name,info in archive.infos.items():
             data = archive.read(name)
             result['entries'].append({'path':name,'bytes':len(data),'sha256':digest(data)})
             if name.endswith(('.xml','.rels')):
                 root = parse_xml(data)
+                roots[name] = root
+                parents = {child:parent for parent in root.iter() for child in parent}
                 namespaces.update(s[1:].split('}')[0] for e in root.iter() for s in [e.tag]+list(e.attrib) if s.startswith('{'))
                 if name.endswith('.rels'):
                     owner = relation_source(name)
@@ -480,16 +651,26 @@ def inspect_bytes(payload, filename='<memory>'):
                             xfrm = e.find('{'+P+'}xfrm')
                             if xfrm is None:
                                 xfrm = e.find('{'+P+'}spPr/{'+A+'}xfrm')
+                            group_transforms=[]
+                            ancestor=parents.get(e)
+                            while ancestor is not None:
+                                if ancestor.tag=='{'+P+'}grpSp':
+                                    gx=ancestor.find('{'+P+'}grpSpPr/{'+A+'}xfrm')
+                                    group_transforms.append({'attributes':dict(gx.attrib) if gx is not None else None,
+                                        'coordinates':{local(child.tag):dict(child.attrib) for child in gx} if gx is not None else None})
+                                ancestor=parents.get(ancestor)
+                            body=e.find('{'+P+'}txBody/{'+A+'}bodyPr')
                             result['shapes'].append({'part':name,'kind':local(e.tag),**prop.attrib,
+                                'text':''.join(t.text or '' for t in e.findall('{'+P+'}txBody/{'+A+'}p//{'+A+'}t')),
+                                'text_fonts':shape_fonts(e),
+                                'body_properties':dict(body.attrib) if body is not None else None,
+                                'transform_attributes':dict(xfrm.attrib) if xfrm is not None else None,
+                                'parent_group_transforms':group_transforms,
                                 'tag_rids':[tag.get('{'+R+'}id') for tag in nv.iter('{'+P+'}tags')],
                                 'chart_rids':[chart.get('{'+R+'}id') for chart in e.iter('{'+C+'}chart')],
                                 'transform_emu':{local(child.tag):child.attrib for child in xfrm} if xfrm is not None else None})
                 if name.startswith('ppt/charts/') and name.endswith('.xml'):
-                    result['native_charts'].append({'part':name,
-                        'types':[local(e.tag) for e in root.iter() if local(e.tag).endswith('Chart')],
-                        'grouping':[e.get('val') for e in root.iter('{'+C+'}grouping')],
-                        'bar_direction':[e.get('val') for e in root.iter('{'+C+'}barDir')],
-                        'series_count':len(list(root.iter('{'+C+'}ser')))})
+                    result['native_charts'].append(native_chart_metadata(root,name))
             if name.startswith('ppt/embeddings/') and data[:8] == CFB_MAGIC:
                 cfb = CompoundFile(data)
                 container = {'part':name,'major_version':cfb.major,'sector_size':cfb.sector_size,'streams':[]}
@@ -518,18 +699,28 @@ def inspect_bytes(payload, filename='<memory>'):
             if tag['name'] == 'THINKCELLSHAPEDONOTDELETE' and tag.get('value'):
                 tag_values[tag['part']].add(tag['value'])
         native = {chart['part']:chart for chart in result['native_charts']}
+        for shape in result['shapes']:
+            for rid in shape['chart_rids']:
+                chart=native.get(relation_map.get((shape['part'],rid)))
+                if chart: resolve_theme(chart,shape['part'],roots,result['relationships'])
         shape_by_token = collections.defaultdict(list)
         for shape in result['shapes']:
             for rid in shape['tag_rids']:
                 for token in tag_values.get(relation_map.get((shape['part'],rid)),set()):
                     shape_by_token[token].append({'slide_part':shape['part'],'shape_id':shape.get('id'),
                         'shape_name':shape.get('name'),'transform_emu':shape['transform_emu'],
+                        'text':shape.get('text'),'text_fonts':shape.get('text_fonts'),
+                        'body_properties':shape.get('body_properties'),
+                        'transform_attributes':shape.get('transform_attributes'),
+                        'parent_group_transforms':shape.get('parent_group_transforms'),
                         'native_charts':[native.get(relation_map.get((shape['part'],chart_rid))) for chart_rid in shape['chart_rids']]})
         for container in result['compound_files']:
             for stream in container['streams']:
                 for chart in stream.get('model',{}).get('charts',[]):
                     token = chart.get('rendered_shape',{}).get('token')
                     chart['resolved_shape_links'] = shape_by_token.get(token,[])
+                    for label in chart.get('presentation_labels',[]):
+                        label['resolved_shape_links'] = shape_by_token.get(label.get('token'),[])
         result['counts'] = {'parts':len(result['entries']),'native_charts':len(result['native_charts']),
             'thinkcell_chart_models':sum(len(s.get('model',{}).get('charts',[])) for c in result['compound_files'] for s in c['streams']),
             'text_targets':len(result['text_targets']), 'custom_xml_parts':sum(n.startswith('customXml/') and n.endswith('.xml') for n in archive.infos)}

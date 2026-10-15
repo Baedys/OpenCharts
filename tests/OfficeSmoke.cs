@@ -10,12 +10,28 @@ public static class OfficeSmoke
 {
     private static int assertions;
     private static void Check(bool condition, string message) { assertions++; if (!condition) throw new Exception(message); }
+    private static void CheckTextBounds(object shape, ChartSpec spec, ChartRectangle frame)
+    {
+        dynamic group = shape;
+        Layout layout = ChartEngine.Build(spec, frame.Width, frame.Height);
+        for (int i = 0; i < layout.Items.Count; i++)
+        {
+            Primitive p = layout.Items[i];
+            if (p.Kind != "text") continue;
+            dynamic text = group.GroupItems.Item(i + 2); // First item is the transparent frame.
+            Check(Math.Abs((double)text.Width - Math.Max(1, p.W)) < .02 && Math.Abs((double)text.Height - Math.Max(1, p.H)) < .02,
+                "Office resized text box: " + p.Text);
+            Check(Math.Abs((double)text.Left - frame.X - p.X) < .02 && Math.Abs((double)text.Top - frame.Y - p.Y) < .02,
+                "Office moved text box: " + p.Text);
+        }
+    }
     [STAThread]
     public static int Main(string[] args)
     {
         string output = Path.GetFullPath(args[0]); Directory.CreateDirectory(output);
         dynamic ppt = null, deck = null, excel = null, workbook = null, books = null, sheets = null, sheet = null, cells = null;
         var matrices = new Dictionary<int, string>();
+        var frames = new Dictionary<int, ChartRectangle>();
         try
         {
             new XmlDocument().LoadXml(new Connect().GetCustomUI("Microsoft.PowerPoint.Presentation"));
@@ -92,16 +108,37 @@ public static class OfficeSmoke
                 Check(ChartStorage.Serialize(ChartStorage.Read((object)shape)) == matrices[index], "Matrix metadata changed on render.");
                 slide.Export(Path.Combine(output, kind + "-" + mode + ".png"), "PNG", 1440, 810);
             }
+            var styled = new ChartSpec { Kind = "Column", LayoutMode = "Stacked", Title = "Synthetic appearance" };
+            styled.Series.AddRange(new string[] { "North", "South" });
+            styled.Rows.Add(new ChartRow { Label = "Q1", Values = new List<double?> { 4, 6 } });
+            styled.Rows.Add(new ChartRow { Label = "Q2", Values = new List<double?> { 8, 2 } });
+            styled.Appearance = new ChartAppearance {
+                SourceFrame = new ChartRectangle { X = 80, Y = 48, Width = 220, Height = 104 },
+                PlotRect = new ChartRectangle { X = 40.0 / 220, Y = 12.0 / 104, Width = 160.0 / 220, Height = 80.0 / 104 },
+                ShowTitle = false, ShowLegend = false, ShowValueAxis = false, ShowGridlines = false,
+                ShowTotals = true, SeriesLabelsAtFirstStack = true, Minimum = 0, Maximum = 10,
+                SeriesColors = new List<string> { "#445566", "#112233" }, DisplayOrder = new List<int> { 1, 0 },
+                ValueFontSize = 10, CategoryFontSize = 10, SeriesFontSize = 10, TotalFontSize = 10,
+                CategoryLabelGap = 2, TotalLabelGap = 2, SeriesLabelGap = 23.3333333333,
+                SeriesLabelHeight = 10, CategoryLabelHeight = 10, TotalLabelHeight = 10, GapRatio = .5
+            };
+            var imports = new List<ChartSpec> { styled };
             for (int argument = 1; argument + 1 < args.Length; argument++)
             {
                 if (args[argument] != "--input-json") continue;
-                var imported = new JavaScriptSerializer().Deserialize<ChartSpec>(File.ReadAllText(args[argument + 1]));
+                imports.Add(new JavaScriptSerializer().Deserialize<ChartSpec>(File.ReadAllText(args[argument + 1])));
+            }
+            foreach (ChartSpec imported in imports)
+            {
                 int index = (int)deck.Slides.Count + 1;
                 dynamic slide = deck.Slides.Add(index, 12);
-                dynamic shape = OfficeRenderer.Render((object)slide, imported, 30, 45, 900, 450);
+                ChartRectangle frame = OfficeRenderer.InsertionFrame(imported, 960, 540);
+                frames[index] = frame;
+                dynamic shape = OfficeRenderer.Render((object)slide, imported, frame.X, frame.Y, frame.Width, frame.Height);
                 matrices[index] = ChartStorage.Serialize(imported);
                 Check(ChartStorage.Serialize(ChartStorage.Read((object)shape)) == matrices[index], "Imported matrix metadata mismatch.");
-                slide.Export(Path.Combine(output, "ImportedData.png"), "PNG", 1440, 810);
+                CheckTextBounds((object)shape, imported, frame);
+                slide.Export(Path.Combine(output, "ImportedData-" + index + ".png"), "PNG", 1440, 810);
             }
             int slideCount = (int)deck.Slides.Count;
             string pptx = Path.Combine(output, "OpenSlideCharts-demo.pptx");
@@ -113,8 +150,15 @@ public static class OfficeSmoke
                 dynamic slide = deck.Slides.Item(i); dynamic group = slide.Shapes.Item(1);
                 ChartSpec spec = ChartStorage.Read((object)group);
                 Check(spec.Rows.Count > 0, "Missing data after reopening.");
-                Check(Math.Abs((double)group.Width - 900) < 1, "Group bounds changed.");
-                if (matrices.ContainsKey(i)) Check(ChartStorage.Serialize(spec) == matrices[i], "Matrix data changed after reopening.");
+                Check(Math.Abs((double)group.Width - (frames.ContainsKey(i) ? frames[i].Width : 900)) < .02, "Group bounds changed.");
+                if (matrices.ContainsKey(i))
+                {
+                    // JSON object member order is not data. Reflection-backed serializers
+                    // may enumerate fields in a different order after importing a model.
+                    var expected = new JavaScriptSerializer().Deserialize<ChartSpec>(matrices[i]);
+                    Check(ChartStorage.Serialize(spec) == ChartStorage.Serialize(expected), "Matrix data changed after reopening slide " + i + ".");
+                }
+                if (frames.ContainsKey(i)) CheckTextBounds((object)group, spec, frames[i]);
             }
             Console.WriteLine("PASS: " + assertions + " Office integration assertions; native charts, metadata, save/reopen, Excel import/refresh, rollback.");
             return 0;

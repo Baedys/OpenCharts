@@ -21,6 +21,35 @@ L'installateur n'a pas été exécuté. Inventaire PE réalisé avec REA ; paylo
 
 Ces dernières observations proviennent d'un lecteur original CFB/ZIP/XML et d'un corpus local de trois fichiers. Elles n'établissent pas la compatibilité avec tous les fichiers think-cell. Le lecteur et les tests synthétiques sont distribuables ; les fichiers propriétaires du corpus restent hors du dépôt.
 
+## Apparence du profil de colonnes empilées
+
+Une analyse supplémentaire croise le modèle privé, le graphique natif OOXML et les textes de la diapositive, sans exécuter le complément propriétaire. L'identité des séries est vérifiée par comparaison unique des valeurs numériques du cache avec le modèle, et par le titre lorsqu'il existe. L'ordre du cache peut différer de l'ordre sémantique du modèle : il est conservé séparément dans `DisplayOrder`.
+
+Les couleurs sont résolues à travers les relations diapositive → disposition → masque → thème et la table `clrMap`. Les polices des textes combinent les propriétés de liste, de paragraphe et de segment ; une taille de liste par défaut ne remplace pas une taille explicitement portée par le texte. Les transformations de couleurs non prises en charge, surcharges de thème non résolues et styles par point restent hors du profil accepté.
+
+Les noms de séries sont reliés par `CSequenceChartDataSeries/m_scdserlabel`. Les catégories passent par `CSequenceChartDataVector/m_scdcatlabel` ; les sommes passent par le groupe de scalaires et `m_scdsumlabel`. Le token `m_ppttb/m_bstrShapeName` retrouve le tag de la forme puis ses coordonnées OOXML. Les indices doivent couvrir chaque série ou catégorie une seule fois. Un nombre de labels correct ne suffit pas si certains sont dupliqués.
+
+`Appearance.SourceFrame` est l'union du cadre graphique natif et des labels placés ainsi reliés ; `PlotRect` est rebasé dans cette union. Le convertisseur mesure les écarts et hauteurs des labels et vérifie leur uniformité à 0,1 point près. Les attributs de rotation et retournement, ainsi que les transformations des groupes parents, sont conservés dans l'inspection. Une transformation non neutre est refusée pour l'apparence tant que sa composition n'est pas implémentée.
+
+Le profil actuel porte sur des colonnes empilées positives avec labels centrés, noms de séries à hauteur des segments de la première colonne, catégories sous la base et sommes au-dessus. Les polices grasses ou italiques sont détectées et refusées pour l'apparence. Les bornes d'axe explicites du cache reproduisent un état enregistré ; les codes privés d'étendue observés ne permettent pas d'affirmer un choix utilisateur « automatique » ou « fixe ».
+
+### Décalages manuels des valeurs
+
+La documentation Microsoft décrit le mode `factor` comme un déplacement depuis la position par défaut, proportionnel à la largeur ou hauteur du graphique. Les décalages sont convertis en points à partir du cadre du graphique natif, avant l'union avec les labels, puis transmis dans `ValueLabelOffsets`. [Microsoft MS-OE376, ST_LayoutMode](https://learn.microsoft.com/en-us/openspecs/office_standards/ms-oe376/2c28b9f6-2128-40c8-8eeb-248651dcd7f3).
+
+Un probe local sous **Office 16.0.20430.20146**, à **1 440 × 810 pixels**, a comparé la référence et deux copies dérivées réservées à l'analyse :
+
+- Ajout de `xMode/yMode=factor` explicites aux neuf labels : **0 pixel différent** par rapport à l'original.
+- Même mode explicite, avec les décalages mis à zéro : **939 pixels différents**.
+
+Les octets de la référence originale sont restés inchangés. Cette expérience établit le comportement de mode absent sur le profil testé, sans généralisation à d'autres types de graphiques ou versions Office. Le convertisseur applique cette interprétation et conserve sa portée empirique dans `ImportWarnings`. Les modes explicites inconnus entraînent un refus de l'apparence ; aucun seuil arbitraire de « petit décalage » n'est utilisé pour les ignorer.
+
+### Portée des contrôles
+
+Les **58 tests Python synthétiques passent** : lecture CFB/ZIP/XML, types et références, refus de données incohérentes, association des séries, styles pris en charge, propriétés géométriques, décalages, couverture unique des labels et transformations. Les **32 contrôles privés de lecture** sur trois présentations passent également ; ce deuxième nombre n'est pas une mesure de parité visuelle.
+
+Un premier comparatif privé entre le rendu reconstruit et le graphique natif a mesuré les neuf segments colorés avec au plus un pixel d'écart sur les bords de leurs boîtes englobantes. Il ne valide pas tous les pixels de texte ni les interactions. Les retouches typographiques et les tests Office continuent séparément. Les données, présentations et images propriétaires de ces expériences ne sont pas incluses dans les sources distribuées ; seuls le lecteur original, les métadonnées de capacité et les tests synthétiques le sont.
+
 ## Références REA
 
 | Observation | Evidence ID |
