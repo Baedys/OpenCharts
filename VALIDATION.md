@@ -7,9 +7,10 @@ Tests locaux réalisés le 15 octobre 2026, sous Windows avec PowerPoint/Excel d
 | Géométrie et validation des entrées | 3 822 assertions réussies | Ce nombre compte les assertions, pas les scénarios |
 | Solveur de cascades | 21 scénarios, 169 assertions réussies | Six scénarios numériques du manuel ; topologie explicitement définie |
 | Géométrie et mutations des connecteurs | 12 scénarios, 363 assertions réussies | Cibles physiques, ambiguïtés, contraintes manuelles et rollback ; pas de gestes UI |
+| Création de connecteurs et ancrages zéro | 14 scénarios, 66 assertions réussies | Politique de reconstruction explicite ; pas de priorité native revendiquée |
 | Pont d’événements COM | 55 contrôles gérés réussis | Cycle de vie testé sans Office ; transport réel couvert séparément |
 | Minuteur de thread | 16 contrôles réussis | STA local pompé, sans HWND ; exécution Office couverte séparément |
-| Interactions Office | 34 assertions réussies, processus terminé avec code 0 | Formes natives et événements COM ; pas de glissement de souris injecté |
+| Interactions Office | 53 assertions réussies, processus terminé avec code 0 | Formes natives et événements COM ; pas de glissement de souris injecté |
 | Préservation des données dans les éditeurs | 25 assertions réussies | Formulaires instanciés sans parcours interactif |
 | Lecteur et convertisseur Python | 58 tests réussis | Fixtures synthétiques, pas un corpus exhaustif |
 | Intégration Office avec un graphique converti | 399 assertions réussies, processus terminé avec code 0 | Une installation Office x64 locale |
@@ -37,13 +38,15 @@ La revue a fait corriger les collisions de lignes effectives entre anciens indic
 
 ## Connecteurs sur la diapositive
 
-`Test-Interactions.ps1` charge le complément réel puis modifie les connecteurs natifs par le modèle objet PowerPoint. Il vérifie la sélection d'un enfant de groupe, le rattachement d'une extrémité, le recalcul de `e` sans figer sa valeur, les ancrages automatiques, le recalcul automatique par minuteur, la sauvegarde/réouverture et l'absence de formes auxiliaires. Il couvre aussi la suppression native d'un connecteur, la navigation immédiate vers une autre diapositive, la suppression du groupe ou de la diapositive et l'entrée dans un ancien graphique sans tags sémantiques. Les 34 assertions ne représentent pas 34 gestes de souris ni une comparaison d'interaction avec think-cell.
+`Test-Interactions.ps1` charge le complément réel puis modifie les connecteurs natifs par le modèle objet PowerPoint. Il vérifie la sélection d'un enfant de groupe, le rattachement d'une extrémité, le recalcul de `e` sans figer sa valeur, les ancrages automatiques, le recalcul automatique par minuteur, la sauvegarde/réouverture et l'absence de formes auxiliaires. Il couvre aussi la suppression native d'un connecteur, la navigation immédiate vers une autre diapositive, la suppression du groupe ou de la diapositive et l'entrée dans un ancien graphique sans tags sémantiques. Les 53 assertions couvrent aussi création depuis des segments, ancrages physiques à zéro, annulation et sauvegarde d'une commande incomplète, navigation, suppression, refus d'un autre graphique avec mêmes IDs et Échap dans les menus. Elles ne représentent pas 53 gestes de souris ni une comparaison d'interaction avec think-cell.
 
 La revue a fait corriger la provenance des ancrages : modifier dans la grille un ancrage créé par un profil le rend manuel, pour éviter son retrait lors d'une réparation automatique ultérieure. L'activation des anciens groupes et la régénération protègent les callbacks de sélection réentrants. Les appels COM externes restent sur le STA du complément avec `StandardOleMarshalObject`. Le minuteur Win32 de thread remplace les tentatives d'accès à `HWND`, refusées par IDispatch sur l'hôte testé.
 
 Les probes de sauvegarde ont observé `BeforeSave` pendant `Save()`, mais aucun callback pendant les appels COM `SaveAs` et `SaveCopyAs` testés. Aucun auxiliaire d'édition n'est donc inséré dans le document. Une sauvegarde automatisée avant validation d'un déplacement peut toujours conserver une géométrie non synchronisée : terminer d'abord la session. Voir [INTERACTION.md](INTERACTION.md).
 
 Les parcours Windows supplémentaires ont validé un déplacement de poignée avec recalcul de −9 à +9, l'activation et la fin de session depuis le sous-menu natif OpenCharts, l'affichage d'une ambiguïté Base/Cumul, sa restauration par Échap et un choix explicite de Base donnant `e = 3`. Ils restent distincts des assertions COM automatisées. Les commandes contextuelles sont enregistrées avec le Ribbon XML Office 2009 pour ne pas dépendre exclusivement de `WindowBeforeRightClick`. Les limites et la procédure reproductible sont consignées dans [UI-VALIDATION.md](UI-VALIDATION.md).
+
+La revue des commandes directes a fait corriger la vérification d'identité du graphique destination et l'annulation par Échap bref dans les sous-menus. Un premier passage Office a révélé une destruction du menu trop tôt pendant `Closed` ; elle est désormais différée après le traitement WinForms. Les appels de fermeture clavier et de traitement d'Échap imbriqué font partie des contrôles Office.
 
 ## Revue et corrections
 
@@ -54,7 +57,7 @@ Le collage valide les données avant de changer la grille ; l'application valide
 ## Restant à vérifier
 
 - Parcours réels des éditeurs, collage pendant l'édition d'une cellule et commandes du ruban.
-- Généralisation des gestes au-delà des deux scénarios de [UI-VALIDATION.md](UI-VALIDATION.md), autres choix et annulations, glissements prolongés et écrans multiples.
+- Généralisation des gestes au-delà des trois scénarios de [UI-VALIDATION.md](UI-VALIDATION.md), autres choix et annulations, glissements prolongés et écrans multiples.
 - Undo/Redo, copie interprésentations, modifications manuelles et autres versions d'Office.
 - Erreurs de formules Excel et classeurs complexes.
 - Formats think-cell absents des références, placement automatique et fidélité de leur apparence.

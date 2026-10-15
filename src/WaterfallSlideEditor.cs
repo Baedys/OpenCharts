@@ -8,7 +8,7 @@ namespace OpenSlideCharts
 {
     // Edits the chart's real native PowerPoint connectors. No helper shapes are
     // inserted into the document; valid endpoint changes update its model.
-    public sealed class WaterfallSlideEditor : IDisposable
+    public sealed partial class WaterfallSlideEditor : IDisposable
     {
         [DllImport("user32.dll")]
         private static extern short GetAsyncKeyState(int key);
@@ -46,7 +46,7 @@ namespace OpenSlideCharts
             if (timer != null) return;
             timer = new PowerPointTimer((object)app, delegate
             {
-                try { PollCount++; if (leaveRequested && Active) Stop(true); else ProcessPendingEdits(false); }
+                try { PollCount++; if (leaveRequested && Active) Stop(true); else if (AddingConnector) PollConnectorCreation(); else ProcessPendingEdits(false); }
                 catch (Exception error) { LastMessage = Describe(error); if (timer != null) timer.Stop(); }
             }, delegate(Exception error) { LastMessage = Describe(error); });
         }
@@ -67,9 +67,14 @@ namespace OpenSlideCharts
             try
             {
                 EnsureTimer();
-                bool tagged = false;
-                for (int i = 1; i <= (int)group.GroupItems.Count; i++) if ((string)group.GroupItems.Item(i).Tags.Item("OSC_ROLE") == "WATERFALL_CONNECTOR") tagged = true;
-                if (!tagged && scene.Connectors.Count > 0) chart = OfficeRenderer.Replace(slide, chart, spec);
+                bool tagged = false, segmentsTagged = false;
+                for (int i = 1; i <= (int)group.GroupItems.Count; i++)
+                {
+                    string role = group.GroupItems.Item(i).Tags.Item("OSC_ROLE");
+                    if (role == "WATERFALL_CONNECTOR") tagged = true;
+                    if (role == "WATERFALL_SEGMENT") segmentsTagged = true;
+                }
+                if (!segmentsTagged || (!tagged && scene.Connectors.Count > 0)) chart = OfficeRenderer.Replace(slide, chart, spec);
                 chartId = (int)((dynamic)chart).Id;
                 BuildHandles();
                 leaveRequested = false; timer.Start(); LastMessage = "Déplacez une extrémité du connecteur vers un niveau de colonne.";
@@ -117,9 +122,9 @@ namespace OpenSlideCharts
             {
                 if (Active && ChartExists() && FrameUnchanged() && HasNativeChanges()) RestoreChart();
                 object selected = chart;
-                chart = null; slide = null; spec = null; scene = null; token = null; currentId = null;
+                chart = null; slide = null; spec = null; scene = null; token = null; currentId = null; pendingSource = null;
                 lines.Clear(); choosing = false; leaveRequested = false;
-                if (menu != null) { menu.Dispose(); menu = null; }
+                CloseCommandMenu();
                 if (selectChart && selected != null) ((dynamic)selected).Select();
                 return selected;
             }
@@ -130,6 +135,7 @@ namespace OpenSlideCharts
             if (!Active || busy || choosing) return;
             try
             {
+                if (AddingConnector) { CreationSelectionChanged(selectionObject); return; }
                 dynamic selection = selectionObject;
                 if ((int)selection.Type != 2) { leaveRequested = true; return; }
                 if ((int)selection.Type == 2 && (int)selection.ShapeRange.Count == 1)
@@ -156,7 +162,7 @@ namespace OpenSlideCharts
         }
         public bool ProcessPendingEdits(bool force = true)
         {
-            if (!Active || busy || choosing || currentId == null) return false;
+            if (!Active || busy || choosing || AddingConnector || currentId == null) return false;
             bool beforeSuppress = suppressSelection;
             busy = true;
             try
@@ -255,6 +261,7 @@ namespace OpenSlideCharts
             int row = index < 0 ? -1 : column.Segments[index].SheetRow >= 0 ? column.Segments[index].SheetRow : index;
             return column.Label + " — " + edge + (row < 0 ? "" : " du segment " + (row + 1));
         }
+        [Obsolete("Use the native Office context menu supplied by Connect.GetCustomUI.")]
         public void ShowContextMenu(object selectionObject, ref bool cancel)
         {
             if (busy || choosing) return;

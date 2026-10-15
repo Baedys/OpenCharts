@@ -11,7 +11,7 @@ Statuts : **prototype** = réalisation partielle testable ; **absent** = non ré
 | Ruban et insertion | Prototype | Reproduire workflows, placement interactif et raccourcis de référence |
 | Menu radial / contextuel | Prototype limité | Menu de cascade réalisé ; menu radial complet et corpus de gestes de référence restants |
 | Éditeur de données | Prototype | Matrice jusqu'à huit séries et cellules absentes ; formules et parité des interactions restantes |
-| Waterfall | Prototype | Segments multiples, `e`, contraintes exactes, connecteurs/ancrages modifiables et total à gauche réalisés ; poignées natives et cibles physiques de segments réalisées ; création directe des liens et règles automatiques générales restantes |
+| Waterfall | Prototype | Segments multiples, `e`, contraintes exactes, connecteurs/ancrages modifiables et total à gauche réalisés ; poignées natives et cibles physiques de segments réalisées ; création directe des liens et ancrage physique à zéro réalisés ; règles automatiques générales et parité des gestes restantes |
 | Colonnes et barres | Prototype | Groupées, empilées, 100 % et séries multiples réalisées ; un profil empilé comparé localement, généralisation et interactions restantes |
 | Courbes et aires | Prototype / absent | Courbes multi-séries avec interruption aux données absentes ; dates, aires et combinaisons restantes |
 | Secteurs et anneaux | Absent | Angles, trous, labels et petits segments |

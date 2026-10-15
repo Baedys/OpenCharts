@@ -7,7 +7,7 @@ Complément PowerPoint Windows open source, sous licence MIT. Le complément s'i
 - Ruban PowerPoint avec insertion et modification de graphiques.
 - Six moteurs de géométrie : cascade, colonnes, barres, courbe, Mekko à deux segments et Gantt en jours relatifs.
 - Cascades multi-segments avec valeurs calculées `e`, connecteurs et ancrages modifiables ; calcul exact des contraintes.
-- Édition des connecteurs sur la diapositive : poignées natives, rattachement aux niveaux de colonnes/segments, suppression et recalcul ; menu contextuel limité.
+- Édition des connecteurs sur la diapositive : poignées natives, rattachement aux niveaux de colonnes/segments, suppression et recalcul ; création directe de liens et placement des bords de segments à zéro depuis le menu natif.
 - Colonnes/barres groupées, empilées et 100 %, courbes multi-séries ; jusqu'à huit séries avec cellules absentes.
 - Import d'une partie vérifiée de l'apparence des colonnes empilées : palette, ordre, polices, échelle, géométrie et étiquettes liées au modèle.
 - Rendu en groupes de formes et textes PowerPoint ordinaires ; les présentations restent visibles sans complément.
@@ -60,7 +60,7 @@ Pour modifier, sélectionner le groupe ou une de ses formes et choisir **Modifie
 
 Le bouton **Cascade** utilise un éditeur dédié : catégories en colonnes, segments en lignes, cellules `e` recalculées. Les onglets Connecteurs et Ancrages modifient les liens et niveaux imposés. Le bouton **Recréer les liens** applique une disposition choisie ; les modifications numériques conservent les contraintes existantes. Voir [WATERFALL.md](WATERFALL.md) pour les quatre dispositions et limites. Les anciens graphiques de cascade restent éditables dans leur format initial. Un [exemple JSON synthétique](examples/WaterfallConstraints.json) peut être ouvert avec **Importer JSON**.
 
-Sélectionner une cascade à contraintes puis **Éditer les connecteurs** expose les poignées PowerPoint. Déplacer une extrémité vers un niveau de colonne ou un bord de segment ; le modèle est recalculé après relâchement et stabilisation. Le clic droit propose un sous-menu natif **OpenCharts** pour les groupes, formes et connecteurs du graphique. Il permet de modifier les données et les connecteurs ; la suppression et la fin de session apparaissent selon la sélection. **Terminer les connecteurs** termine la session. Voir [INTERACTION.md](INTERACTION.md) pour les limites de synchronisation des sauvegardes automatisées.
+Sélectionner une cascade à contraintes puis **Éditer les connecteurs** expose les poignées PowerPoint. Déplacer une extrémité vers un niveau de colonne ou un bord de segment ; le modèle est recalculé après relâchement et stabilisation. Le clic droit propose un sous-menu natif **OpenCharts** pour les groupes, formes et connecteurs du graphique. Il permet de modifier les données et les connecteurs ; la suppression et la fin de session apparaissent selon la sélection. Sur un segment, il propose aussi **Ajouter un connecteur depuis…**, puis le choix du segment d'arrivée, et **Placer le sommet/pied à zéro**. Les réparations ambiguës d'ancrages automatiques exigent un choix explicite ; voir [WATERFALL.md](WATERFALL.md). **Terminer les connecteurs** termine la session. Voir [INTERACTION.md](INTERACTION.md) pour les limites de synchronisation des sauvegardes automatisées.
 
 ![Cascade synthétique rendue par OpenCharts](examples/WaterfallConstraints.png)
 
@@ -76,9 +76,9 @@ La réédition régénère les formes ; les personnalisations manuelles et anima
 
 Les tests d'intégration distribués nécessitent Office installé et utilisent des documents synthétiques. Des comparaisons privées supplémentaires portent sur un profil de colonnes empilées, décrit dans [RECONSTRUCTION.md](RECONSTRUCTION.md). Elles ne démontrent ni parité visuelle globale ni parité des interactions.
 
-Résultats et limites détaillés dans [VALIDATION.md](VALIDATION.md) : **3 822 assertions moteur, 169 assertions du solveur de cascades, 363 assertions d’interaction du modèle, 25 assertions d’éditeur, 55 contrôles du pont COM, 16 du minuteur, 58 tests Python, 34 contrôles d’interaction Office et 399 contrôles de la suite Office** avec le profil de référence optionnel. Sur ce profil empilé, les bords des neuf segments reconstruits diffèrent au plus d’un pixel à 1440 × 810. Ce résultat limité ne couvre pas toutes les étiquettes ni les interactions.
+Résultats et limites détaillés dans [VALIDATION.md](VALIDATION.md) : **3 822 assertions moteur, 169 assertions du solveur de cascades, 363 assertions d’interaction du modèle, 66 assertions de commandes, 25 assertions d’éditeur, 55 contrôles du pont COM, 16 du minuteur, 58 tests Python, 53 contrôles d’interaction Office et 399 contrôles de la suite Office** avec le profil de référence optionnel. Sur ce profil empilé, les bords des neuf segments reconstruits diffèrent au plus d’un pixel à 1440 × 810. Ce résultat limité ne couvre pas toutes les étiquettes ni les interactions.
 
-Après installation, fermer PowerPoint puis lancer `Test-Office.ps1`. Le script démarre PowerPoint normalement avant de piloter les tests : un démarrage Office réservé à l'automatisation peut omettre les compléments utilisateur. Les tests Excel créent leur propre instance. `Test-Interactions.ps1` vérifie aussi les callbacks COM, le minuteur et l'édition des connecteurs natifs. Deux parcours souris ciblés, les menus natifs et une annulation d'ancrage ont été vérifiés ; voir [UI-VALIDATION.md](UI-VALIDATION.md). La couverture exhaustive des gestes et Undo/Redo reste à réaliser. L'option `-InputJson chemin.json` ajoute un test de rendu et de persistance d'un graphique converti ; son résultat reste local.
+Après installation, fermer PowerPoint puis lancer `Test-Office.ps1`. Le script démarre PowerPoint normalement avant de piloter les tests : un démarrage Office réservé à l'automatisation peut omettre les compléments utilisateur. Les tests Excel créent leur propre instance. `Test-Interactions.ps1` vérifie aussi les callbacks COM, le minuteur et l'édition des connecteurs natifs. Trois parcours souris ciblés couvrent les menus natifs, le rattachement, l'ajout avec choix de réparation, l'ancrage à zéro et Échap imbriqué ; voir [UI-VALIDATION.md](UI-VALIDATION.md). La couverture exhaustive des gestes et Undo/Redo reste à réaliser. L'option `-InputJson chemin.json` ajoute un test de rendu et de persistance d'un graphique converti ; son résultat reste local.
 
 ## Structure
 
@@ -91,7 +91,8 @@ Après installation, fermer PowerPoint puis lancer `Test-Office.ps1`. Le script 
 - `src/WaterfallModel.cs`, `WaterfallSolver.cs`, `WaterfallChart.cs` : modèle, résolution exacte et rendu des cascades.
 - `src/WaterfallEditor.cs` : données, connecteurs et ancrages de cascade.
 - `src/WaterfallGeometry.cs` : géométrie commune, cibles physiques et mutations de connecteurs.
-- `src/WaterfallSlideEditor.cs` : édition des connecteurs natifs et menu contextuel.
+- `src/WaterfallSlideEditor.cs`, `WaterfallSlideCommands.cs` : édition native, création des liens et ancrages à zéro.
+- `src/WaterfallCommands.cs` : commandes transactionnelles et analyse des réparations possibles.
 - `src/PowerPointEvents.cs`, `PowerPointTimer.cs` : événements COM et observation sur le thread Office.
 - `src/Connect.cs` : interfaces COM et ruban.
 - `tests/` : tests du moteur et intégration Office.

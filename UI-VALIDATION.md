@@ -1,6 +1,6 @@
 # Parcours souris et menus contextuels
 
-Vérifications effectuées le 15 octobre 2026 sur PowerPoint Windows x64 16.0.20430.20146. Les graphiques sont synthétiques, créés par OpenCharts. Les gestes utilisent le contrôle Windows Computer Use ; les valeurs et contraintes sont ensuite relues par le modèle objet PowerPoint. Ces parcours ne sont pas une comparaison d'exécution avec think-cell. Les fichiers JSON fournis reprennent les données et contraintes des deux fixtures utilisées ; leur import par dialogue n'a pas été exercé pendant ces gestes.
+Vérifications effectuées le 15 octobre 2026 sur PowerPoint Windows x64 16.0.20430.20146. Les graphiques sont synthétiques, créés par OpenCharts. Les gestes utilisent le contrôle Windows Computer Use ; les valeurs et contraintes sont ensuite relues par le modèle objet PowerPoint. Ces parcours ne sont pas une comparaison d'exécution avec think-cell. Les fichiers JSON fournis reprennent les données et contraintes des trois fixtures utilisées ; leur import par dialogue n'a pas été exercé pendant ces gestes.
 
 ## Total à gauche
 
@@ -26,10 +26,24 @@ Appuyer sur Échap a fermé ce menu, restauré la ligne initiale et conservé `e
 
 Après réactivation, le même déplacement suivi du choix **Colonne 2 — Base** a produit `e = 3`. La métadonnée droite du premier lien est devenue C2 avec poids `[0]` ; les autres liens sont conservés. La session est restée active. Le choix **Cumul**, le clic sur **Annuler le déplacement**, l'annulation par clic extérieur et les modifications numériques après chaque choix restent à vérifier par des gestes distincts.
 
+## Création directe, ancrage à zéro et Échap imbriqué
+
+La troisième fixture correspond à [WaterfallIndependentSums.json](examples/WaterfallIndependentSums.json) : deux colonnes numériques 3 et 5, sans connecteur, avec deux ancrages de base automatiques à zéro. Le graphique a été créé par le harness, puis les commandes suivantes ont été déclenchées uniquement par gestes Windows :
+
+1. Sélection du segment C0 ; clic droit → **OpenCharts → Ajouter un connecteur depuis… → Sommet du segment**.
+2. Sélection du segment C1 → **Pied du segment → Égaliser les niveaux**. Le menu de réparation affiche séparément les bases de C0 et C1, ainsi que **Conserver les ancrages**.
+3. Choix de l'ancrage automatique de C1. Le graphique affiche les sorties 3 et 8. La relecture retrouve un lien C0 `[1]` → C1 `[0]`, `Constrain=true`, et seulement P0 à zéro. Les données restent 3 et 5 ; P1 est retiré.
+4. Sur C1, **OpenCharts → Placer le sommet à zéro**. Sa sortie devient zéro et son pied −5 ; C0 va de −8 à −5. La relecture conserve le même lien et les deux données, retire l'ancrage automatique restant et retrouve un ancrage manuel C1 `[1]` à zéro.
+5. Nouvel ajout depuis le sommet de C1, sélection de C0, ouverture du sous-menu **Pied du segment** contenant Égaliser/Libre, puis frappe brève d'Échap. Tous les menus se ferment. Relecture : `connector-editing=False`, `connector-adding=False`, un seul lien, mêmes données et même ancrage manuel qu'avant cette tentative.
+
+Le parcours vérifie donc le callback réel des items, le remplacement d'un menu de destination par un menu de réparation, le choix explicite d'une réparation et l'annulation depuis un sous-menu imbriqué. La destruction des menus est différée après leur fermeture : un premier test COM avait détecté une `ObjectDisposedException` lorsqu'ils étaient détruits synchroniquement dans `Closed`.
+
+Les variantes **Connecteur libre**, création depuis Pied/Cumul, placement du pied à zéro, choix de l'autre réparation et **Conserver les ancrages** n'ont pas été exercées par gestes dans cette fixture. Les tests de modèle couvrent leur politique de contraintes ; cela ne remplace pas leurs futurs parcours UI.
+
 ## Limites de la preuve
 
-Les clics droits automatisés initiaux ont ouvert le menu Office sans callback `WindowBeforeRightClick`, aussi bien via `ComEventsHelper` que via un abonnement PIA Microsoft séparé et pompé. Les clics gauches ont livré `WindowSelectionChange`. Ces observations ne déterminent pas si l'origine tient à l'injection d'entrée, au contexte Office ou à un autre facteur ; elles ne prouvent pas que l'événement serait universellement absent. Le menu Ribbon XML fournit donc les commandes sans dépendre de sa livraison. L'ancien menu géré reste disponible lorsque cet événement est livré.
+Les clics droits automatisés initiaux ont ouvert le menu Office sans callback `WindowBeforeRightClick`, aussi bien via `ComEventsHelper` que via un abonnement PIA Microsoft séparé et pompé. Les clics gauches ont livré `WindowSelectionChange`. Ces observations ne déterminent pas si l'origine tient à l'injection d'entrée, au contexte Office ou à un autre facteur ; elles ne prouvent pas que l'événement serait universellement absent. Le menu Ribbon XML fournit donc les commandes sans dépendre de sa livraison. Le complément ne branche plus l'ancien menu géré sur cet événement ; la méthode publique est conservée comme API obsolète.
 
 Un premier glissement a été refusé par l'outil parce qu'un autre processus recouvrait le point de départ. Après activation de PowerPoint et nouvelle capture, le glissement a réussi. Ce refus n'est pas compté comme un déplacement validé. Un incident du helper Computer Use a été résolu en réinitialisant sa session JavaScript avant reprise.
 
-Ces résultats couvrent deux petites cascades et une installation Office. Ils ne valident pas le menu radial think-cell, les gestes prolongés, toutes les annulations, Undo/Redo, les présentations concurrentes, les écrans multiples ou toutes les versions d'Office.
+Ces résultats couvrent trois petites cascades et une installation Office. Ils ne valident pas le menu radial think-cell, les gestes prolongés, toutes les annulations, Undo/Redo, les présentations concurrentes, les écrans multiples ou toutes les versions d'Office.

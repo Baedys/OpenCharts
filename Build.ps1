@@ -23,6 +23,10 @@ if ($Test) {
     if ($LASTEXITCODE -ne 0) { throw 'Waterfall interaction test build failed.' }
     & (Join-Path $bin 'WaterfallInteractionTests.exe')
     if ($LASTEXITCODE -ne 0) { throw 'Waterfall interaction tests failed.' }
+    & $compiler /nologo /target:exe '/r:System.Numerics.dll' ('/r:' + (Join-Path $bin 'OpenSlideCharts.dll')) ('/out:' + (Join-Path $bin 'WaterfallCommandTests.exe')) (Join-Path $root 'tests\WaterfallCommandTests.cs')
+    if ($LASTEXITCODE -ne 0) { throw 'Waterfall command test build failed.' }
+    & (Join-Path $bin 'WaterfallCommandTests.exe')
+    if ($LASTEXITCODE -ne 0) { throw 'Waterfall command tests failed.' }
     & $compiler /nologo /target:exe ('/out:' + (Join-Path $bin 'PowerPointEventsTests.exe')) (Join-Path $root 'src\PowerPointEvents.cs') (Join-Path $root 'tests\PowerPointEventsTests.cs')
     if ($LASTEXITCODE -ne 0) { throw 'PowerPoint event test build failed.' }
     & (Join-Path $bin 'PowerPointEventsTests.exe')

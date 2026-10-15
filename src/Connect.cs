@@ -44,7 +44,7 @@ namespace OpenSlideCharts
             try
             {
                 slideEditor = new WaterfallSlideEditor(application, delegate { EditChart(null); });
-                events = new PowerPointEvents(application, SelectionChanged, slideEditor.ShowContextMenu,
+                events = new PowerPointEvents(application, SelectionChanged, null,
                     BeforePresentationSave, BeforePresentationSave, delegate(object presentation, object window) { slideEditor.SafeStop(); InvalidateRibbon(); });
             }
             catch (Exception error) { interactionError = error.Message; if (slideEditor != null) { slideEditor.Dispose(); slideEditor = null; } }
@@ -68,7 +68,7 @@ namespace OpenSlideCharts
             try { if (slideEditor != null) slideEditor.Stop(true); InvalidateRibbon(); if (disconnectPending) DisconnectInteractions(); }
             catch (Exception error) { cancel = true; interactionError = error.Message; MessageBox.Show("L'édition des connecteurs n'a pas pu être terminée. Réessayez après avoir terminé l'édition.\n" + error.Message, "OpenSlideCharts", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         }
-        public string DiagnosticStatus() { return "OpenSlideCharts 0.1; connected=" + (app != null) + "; ribbon=" + ribbonRequested + "; events=" + (events != null) + "; connector-editing=" + (slideEditor != null && slideEditor.Active) + "; edits=" + (slideEditor == null ? 0 : slideEditor.AppliedEdits) + "; polls=" + (slideEditor == null ? 0 : slideEditor.PollCount) + "; interaction=" + (interactionError ?? (slideEditor == null ? "" : slideEditor.LastMessage)); }
+        public string DiagnosticStatus() { return "OpenSlideCharts 0.1; connected=" + (app != null) + "; ribbon=" + ribbonRequested + "; events=" + (events != null) + "; connector-editing=" + (slideEditor != null && slideEditor.Active) + "; connector-adding=" + (slideEditor != null && slideEditor.AddingConnector) + "; edits=" + (slideEditor == null ? 0 : slideEditor.AppliedEdits) + "; polls=" + (slideEditor == null ? 0 : slideEditor.PollCount) + "; interaction=" + (interactionError ?? (slideEditor == null ? "" : slideEditor.LastMessage)); }
         public string GetCustomUI(string ribbonId)
         {
             ribbonRequested = true;
@@ -116,6 +116,13 @@ namespace OpenSlideCharts
                 xml.Append("<button id='oscContextData" + suffix + "' label='Modifier les données' onAction='EditChart'/>");
                 xml.Append("<button id='oscContextLinks" + suffix + "' label='Modifier les connecteurs' getVisible='GetWaterfallContextVisible' onAction='EditConnectors'/>");
                 xml.Append("<button id='oscContextDelete" + suffix + "' label='Supprimer ce connecteur' getVisible='GetConnectorContextVisible' onAction='DeleteConnector'/>");
+                xml.Append("<menu id='oscContextCreate" + suffix + "' label='Ajouter un connecteur depuis…' getVisible='GetSegmentContextVisible'>");
+                xml.Append("<button id='oscContextCreateTop" + suffix + "' label='Sommet du segment' onAction='BeginConnectorFromTop'/>");
+                xml.Append("<button id='oscContextCreateBottom" + suffix + "' label='Pied du segment' onAction='BeginConnectorFromBottom'/>");
+                xml.Append("<button id='oscContextCreateOutput" + suffix + "' label='Cumul de la colonne' onAction='BeginConnectorFromOutput'/></menu>");
+                xml.Append("<button id='oscContextZeroTop" + suffix + "' label='Placer le sommet à zéro' getVisible='GetSegmentContextVisible' onAction='PinSegmentTopZero'/>");
+                xml.Append("<button id='oscContextZeroBottom" + suffix + "' label='Placer le pied à zéro' getVisible='GetSegmentContextVisible' onAction='PinSegmentBottomZero'/>");
+                xml.Append("<button id='oscContextCancelCreate" + suffix + "' label='Annuler l’ajout du connecteur' getVisible='GetPendingConnectorVisible' onAction='CancelConnectorCreation'/>");
                 xml.Append("<button id='oscContextFinish" + suffix + "' label='Terminer les connecteurs' getVisible='GetFinishContextVisible' onAction='EndConnectorEditing'/>");
                 xml.Append("</menu></contextMenu>");
             }
@@ -133,6 +140,44 @@ namespace OpenSlideCharts
         { var selected = ContextSelection(); return events != null && selected != null && selected.Spec.Waterfall != null && selected.Primitive != null && selected.Primitive.Role == "WATERFALL_CONNECTOR"; }
         public bool GetFinishContextVisible(object control)
         { return slideEditor != null && slideEditor.Active && GetWaterfallContextVisible(control); }
+        public bool GetSegmentContextVisible(object control)
+        { var selected = ContextSelection(); return events != null && selected != null && selected.Spec.Waterfall != null && selected.Primitive != null && selected.Primitive.Role == "WATERFALL_SEGMENT" && (slideEditor == null || !slideEditor.AddingConnector); }
+        public bool GetPendingConnectorVisible(object control)
+        { return slideEditor != null && slideEditor.AddingConnector && GetWaterfallContextVisible(control); }
+        public void BeginConnectorFromTop(object control) { SegmentCommand("Top", false); }
+        public void BeginConnectorFromBottom(object control) { SegmentCommand("Bottom", false); }
+        public void BeginConnectorFromOutput(object control) { SegmentCommand("Output", false); }
+        public void PinSegmentTopZero(object control) { SegmentCommand("Top", true); }
+        public void PinSegmentBottomZero(object control) { SegmentCommand("Bottom", true); }
+        public void CompleteConnectorAtTop(object control) { CompleteConnector("Top", true); }
+        public void CompleteConnectorAtBottom(object control) { CompleteConnector("Bottom", true); }
+        public void CompleteConnectorAtOutput(object control) { CompleteConnector("Output", true); }
+        public void CompleteFreeConnectorAtTop(object control) { CompleteConnector("Top", false); }
+        public void CompleteFreeConnectorAtBottom(object control) { CompleteConnector("Bottom", false); }
+        public void CompleteFreeConnectorAtOutput(object control) { CompleteConnector("Output", false); }
+        public void CancelConnectorCreation(object control)
+        { Run(delegate { if (slideEditor != null) slideEditor.CancelConnectorCreation(); InvalidateRibbon(); }); }
+        private OfficeChartSelection SelectedSegment()
+        {
+            OfficeChartSelection selected = ContextSelection();
+            if (events == null || slideEditor == null || selected == null || selected.Primitive == null || selected.Primitive.Role != "WATERFALL_SEGMENT")
+                throw new InvalidOperationException("Sélectionnez un segment de cascade.");
+            return selected;
+        }
+        private void SegmentCommand(string edge, bool pin)
+        {
+            Run(delegate
+            {
+                OfficeChartSelection selected = SelectedSegment(); Primitive item = selected.Primitive;
+                if (pin) slideEditor.PinSegmentZero(ActiveSlide(), selected.Chart, item.ColumnId, item.SegmentId, edge);
+                else slideEditor.BeginSegmentConnector(ActiveSlide(), selected.Chart, item.ColumnId, item.SegmentId, edge);
+                InvalidateRibbon();
+            });
+        }
+        private void CompleteConnector(string edge, bool constrain)
+        {
+            Run(delegate { OfficeChartSelection selected = SelectedSegment(); Primitive item = selected.Primitive; slideEditor.CompleteSegmentConnector(selected.Chart, item.ColumnId, item.SegmentId, edge, constrain); InvalidateRibbon(); });
+        }
         public void DeleteConnector(object control)
         {
             Run(delegate
