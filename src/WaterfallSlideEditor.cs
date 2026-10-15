@@ -207,6 +207,17 @@ namespace OpenSlideCharts
             WaterfallInteraction.Reattach(candidate.Waterfall, currentId, first, target.Anchor);
             Apply(candidate); LastMessage = "Connecteur rattaché ; valeurs e recalculées.";
         }
+        public void DeleteConnector(object slideObject, object chartObject, string connectorId)
+        {
+            if (!Active || !SameObject(chart, chartObject)) Start(slideObject, chartObject, connectorId);
+            else ProcessPendingEdits(true);
+            if (!Active || choosing) throw new InvalidOperationException("Terminez le déplacement en cours avant de supprimer un connecteur.");
+            ChartSpec candidate = ChartStorage.Clone(spec);
+            WaterfallInteraction.DeleteConnector(candidate.Waterfall, connectorId);
+            bool previous = busy; busy = true;
+            try { Apply(candidate); LastMessage = "Connecteur supprimé ; sommes recalculées."; }
+            finally { busy = previous; }
+        }
         private void Apply(ChartSpec candidate)
         {
             // Validate both geometry and metadata before disturbing the source chart.

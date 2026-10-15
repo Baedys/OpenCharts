@@ -42,9 +42,12 @@ public static class InteractionOffice
             external=new PowerPointEvents((object)app,delegate(object sel){selected++;},null,delegate(object pres,ref bool cancel){saving++;},delegate(object pres,ref bool cancel){closing++;});
             dynamic slide=deck.Slides.Add(1,12);var spec=LeftExample();dynamic group=OfficeRenderer.Render((object)slide,spec,30,35,900,470);group.Select();Pump(100);
             Check(selected>0,"Selection event was not dispatched over COM.");
+            Check((bool)api.GetChartContextVisible(null)&&(bool)api.GetWaterfallContextVisible(null),"Chart context commands hidden for a waterfall group.");
+            Check(!(bool)api.GetConnectorContextVisible(null)&&!(bool)api.GetFinishContextVisible(null),"Connector-only commands shown for an inactive group.");
             int connectorItem=-1;for(int i=1;i<=(int)group.GroupItems.Count;i++){dynamic child=group.GroupItems.Item(i);if((string)child.Tags.Item("OSC_ROLE")=="WATERFALL_CONNECTOR"){connectorItem=i;break;}}
             Check(connectorItem>0,"Missing primitive role tags.");group.GroupItems.Item(connectorItem).Select();Pump(100);
             var selection=OfficeChartSelection.Resolve((object)app.ActiveWindow.Selection);Check(selection!=null&&selection.Primitive!=null&&selection.Primitive.EntityId==spec.Waterfall.Connectors[0].Id,"Child selection did not resolve its owning chart/connector.");
+            Check((bool)api.GetConnectorContextVisible(null),"Delete context command hidden for a native connector.");
             string file=Path.Combine(Path.GetFullPath(args[0]),"InteractiveWaterfall.pptx");deck.SaveAs(file,24);api.EditConnectors(null);Check(Overlays(slide)==0&&(int)slide.Shapes.Count==1,"Entering native editing added document helper shapes.");
             dynamic line=NativeConnector(slide,0);ConnectorEndpoints points=ConnectorEndpoints.Read((object)line);var scene=WaterfallScene.Build(spec.Waterfall,900,470);
             var target=scene.Targets.Find(delegate(WaterfallTarget t){return t.ColumnId=="C3"&&t.Edge=="Output"&&t.Side=="Left";});
@@ -92,6 +95,14 @@ public static class InteractionOffice
             Check(((string)api.DiagnosticStatus()).Contains("connector-editing=True"),"Upgrading an old chart reentered and cleared the session.");
             Check(NativeConnector(second,0)!=null&&(int)second.Shapes.Count==1,"Upgrade did not regenerate native connectors transactionally.");
             api.EndConnectorEditing(null);
+            ((dynamic)Root(second)).Delete();
+            group=OfficeRenderer.Render((object)second,WaterfallProfiles.Sample(),30,35,900,470);group.Select();NativeConnector(second,0).Select();
+            api.DeleteConnector(null);Pump(150);
+            changed=ChartStorage.Read(Root(second));
+            Check(changed.Waterfall.Connectors.Count==4&&WaterfallSolver.Solve(changed.Waterfall).Columns[3].Output==6,"Context delete callback did not update the native chart model.");
+            api.EndConnectorEditing(null);
+            dynamic ordinary=second.Shapes.AddShape(1,5f,5f,20f,20f);ordinary.Select();Pump(100);
+            Check(!(bool)api.GetChartContextVisible(null)&&!(bool)api.GetWaterfallContextVisible(null)&&!(bool)api.GetConnectorContextVisible(null)&&!(bool)api.GetFinishContextVisible(null),"OpenCharts commands leaked onto an ordinary shape.");
             Console.WriteLine("PASS: "+checks+" Office interaction assertions; COM events, child selection, endpoint change, automatic grounding, save/reopen, native deletion without helper shapes.");return 0;
         }
         catch(Exception error){Console.Error.WriteLine(error);return 1;}

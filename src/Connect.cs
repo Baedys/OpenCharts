@@ -32,6 +32,7 @@ namespace OpenSlideCharts
     {
         private dynamic app;
         private bool ribbonRequested;
+        private dynamic ribbon;
         private PowerPointEvents events;
         private WaterfallSlideEditor slideEditor;
         private string interactionError;
@@ -43,8 +44,8 @@ namespace OpenSlideCharts
             try
             {
                 slideEditor = new WaterfallSlideEditor(application, delegate { EditChart(null); });
-                events = new PowerPointEvents(application, slideEditor.SelectionChanged, slideEditor.ShowContextMenu,
-                    BeforePresentationSave, BeforePresentationSave, delegate(object presentation, object window) { slideEditor.SafeStop(); });
+                events = new PowerPointEvents(application, SelectionChanged, slideEditor.ShowContextMenu,
+                    BeforePresentationSave, BeforePresentationSave, delegate(object presentation, object window) { slideEditor.SafeStop(); InvalidateRibbon(); });
             }
             catch (Exception error) { interactionError = error.Message; if (slideEditor != null) { slideEditor.Dispose(); slideEditor = null; } }
         }
@@ -58,20 +59,20 @@ namespace OpenSlideCharts
             {
                 if (slideEditor != null) slideEditor.Dispose();
                 if (events != null) events.Dispose();
-                events = null; slideEditor = null; app = null; disconnectPending = false;
+                events = null; slideEditor = null; ribbon = null; app = null; disconnectPending = false;
             }
             catch (Exception error) { interactionError = error.Message; }
         }
         private void BeforePresentationSave(object presentation, ref bool cancel)
         {
-            try { if (slideEditor != null) slideEditor.Stop(true); if (disconnectPending) DisconnectInteractions(); }
+            try { if (slideEditor != null) slideEditor.Stop(true); InvalidateRibbon(); if (disconnectPending) DisconnectInteractions(); }
             catch (Exception error) { cancel = true; interactionError = error.Message; MessageBox.Show("L'édition des connecteurs n'a pas pu être terminée. Réessayez après avoir terminé l'édition.\n" + error.Message, "OpenSlideCharts", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         }
         public string DiagnosticStatus() { return "OpenSlideCharts 0.1; connected=" + (app != null) + "; ribbon=" + ribbonRequested + "; events=" + (events != null) + "; connector-editing=" + (slideEditor != null && slideEditor.Active) + "; edits=" + (slideEditor == null ? 0 : slideEditor.AppliedEdits) + "; polls=" + (slideEditor == null ? 0 : slideEditor.PollCount) + "; interaction=" + (interactionError ?? (slideEditor == null ? "" : slideEditor.LastMessage)); }
         public string GetCustomUI(string ribbonId)
         {
             ribbonRequested = true;
-            return @"<customUI xmlns='http://schemas.microsoft.com/office/2009/07/customui'><ribbon><tabs><tab id='oscTab' label='OpenSlideCharts'>
+            return @"<customUI xmlns='http://schemas.microsoft.com/office/2009/07/customui' onLoad='OnRibbonLoad'><ribbon><tabs><tab id='oscTab' label='OpenSlideCharts'>
               <group id='oscInsert' label='Graphiques éditables'>
                 <button id='oscWaterfall' label='Cascade' size='large' tag='Waterfall' onAction='InsertChart'/>
                 <button id='oscColumn' label='Colonnes' size='large' tag='Column' onAction='InsertChart'/>
@@ -91,7 +92,57 @@ namespace OpenSlideCharts
                 <button id='oscRefreshAll' label='Actualiser la présentation' onAction='RefreshAll'/>
               </group>
               <group id='oscInfo' label='Version 0.1'><button id='oscAbout' label='À propos / limites' onAction='About'/></group>
-            </tab></tabs></ribbon></customUI>";
+            </tab></tabs></ribbon>" + ContextMenus() + "</customUI>";
+        }
+        public void OnRibbonLoad(object ribbonUi) { ribbon = ribbonUi; }
+        private void SelectionChanged(object selection)
+        {
+            if (slideEditor != null) slideEditor.SelectionChanged(selection);
+            InvalidateRibbon();
+        }
+        private void InvalidateRibbon()
+        {
+            if (ribbon != null) try { ribbon.Invalidate(); } catch (COMException) { }
+        }
+        private static string ContextMenus()
+        {
+            // Official Office Fluent IDs; context menus also cover keyboard invocation.
+            string[] ids = { "ContextMenuObjectsGroup", "ContextMenuShape", "ContextMenuShapeConnector" };
+            var xml = new System.Text.StringBuilder("<contextMenus>");
+            for (int i = 0; i < ids.Length; i++)
+            {
+                string suffix = i.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                xml.Append("<contextMenu idMso='" + ids[i] + "'><menu id='oscContext" + suffix + "' label='OpenCharts' getVisible='GetChartContextVisible'>");
+                xml.Append("<button id='oscContextData" + suffix + "' label='Modifier les données' onAction='EditChart'/>");
+                xml.Append("<button id='oscContextLinks" + suffix + "' label='Modifier les connecteurs' getVisible='GetWaterfallContextVisible' onAction='EditConnectors'/>");
+                xml.Append("<button id='oscContextDelete" + suffix + "' label='Supprimer ce connecteur' getVisible='GetConnectorContextVisible' onAction='DeleteConnector'/>");
+                xml.Append("<button id='oscContextFinish" + suffix + "' label='Terminer les connecteurs' getVisible='GetFinishContextVisible' onAction='EndConnectorEditing'/>");
+                xml.Append("</menu></contextMenu>");
+            }
+            return xml.Append("</contextMenus>").ToString();
+        }
+        private OfficeChartSelection ContextSelection()
+        {
+            try { return app == null ? null : OfficeChartSelection.Resolve((object)app.ActiveWindow.Selection); }
+            catch { return null; }
+        }
+        public bool GetChartContextVisible(object control) { return ContextSelection() != null; }
+        public bool GetWaterfallContextVisible(object control)
+        { var selected = ContextSelection(); return events != null && selected != null && selected.Spec.Waterfall != null; }
+        public bool GetConnectorContextVisible(object control)
+        { var selected = ContextSelection(); return events != null && selected != null && selected.Spec.Waterfall != null && selected.Primitive != null && selected.Primitive.Role == "WATERFALL_CONNECTOR"; }
+        public bool GetFinishContextVisible(object control)
+        { return slideEditor != null && slideEditor.Active && GetWaterfallContextVisible(control); }
+        public void DeleteConnector(object control)
+        {
+            Run(delegate
+            {
+                OfficeChartSelection selected = ContextSelection();
+                if (slideEditor == null || events == null || selected == null || selected.Primitive == null || selected.Primitive.Role != "WATERFALL_CONNECTOR")
+                    throw new InvalidOperationException("Sélectionnez un connecteur de cascade.");
+                slideEditor.DeleteConnector(ActiveSlide(), selected.Chart, selected.Primitive.EntityId);
+                InvalidateRibbon();
+            });
         }
         public void InsertChart(object control)
         {
@@ -134,10 +185,11 @@ namespace OpenSlideCharts
                 if (selection == null) throw new InvalidOperationException("Sélectionnez une cascade ou un de ses connecteurs.");
                 string id = selection.Primitive != null && selection.Primitive.Role == "WATERFALL_CONNECTOR" ? selection.Primitive.EntityId : null;
                 slideEditor.Start(ActiveSlide(), selection.Chart, id);
+                InvalidateRibbon();
             });
         }
-        public void ApplyConnectorMove(object control) { Run(delegate { if (slideEditor != null) slideEditor.ProcessPendingEdits(true); }); }
-        public void EndConnectorEditing(object control) { Run(delegate { if (slideEditor != null) slideEditor.Stop(true, true); }); }
+        public void ApplyConnectorMove(object control) { Run(delegate { if (slideEditor != null) slideEditor.ProcessPendingEdits(true); InvalidateRibbon(); }); }
+        public void EndConnectorEditing(object control) { Run(delegate { if (slideEditor != null) slideEditor.Stop(true, true); InvalidateRibbon(); }); }
         private static ChartSpec EditSpec(ChartSpec source, double? width = null, double? height = null)
         {
             if (source.Waterfall != null)
