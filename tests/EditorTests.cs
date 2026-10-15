@@ -84,8 +84,40 @@ public static class EditorTests
                     Check(true, "The actual enlarged group dimensions must override its original source frame.");
                 }
             }
+            Cascade();
             Console.WriteLine("PASS: " + checks + " editor data assertions (no interactive UI coverage)"); return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
+    }
+    private static void Cascade()
+    {
+        var spec = WaterfallProfiles.Sample(); string original = ChartStorage.Serialize(spec);
+        using (var editor = new WaterfallEditor(spec))
+        {
+            var readMethod = typeof(WaterfallEditor).GetMethod("ReadSpec", BindingFlags.Instance | BindingFlags.NonPublic);
+            var data = (DataGridView)typeof(WaterfallEditor).GetField("data", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(editor);
+            var read = (ChartSpec)readMethod.Invoke(editor, null);
+            Check(ChartStorage.Serialize(read) == original, "Waterfall editor must preserve unchanged data, IDs and constraints.");
+            data.Rows[0].Cells[2].Value = "40";
+            read = (ChartSpec)readMethod.Invoke(editor, null);
+            var solved = WaterfallSolver.Solve(read.Waterfall);
+            Check(solved.Columns[3].Output == 111 && solved.Columns[5].Output == 106, "Numeric editing must recalculate all dependent e values.");
+            Check(read.Waterfall.Connectors[0].Id == spec.Waterfall.Connectors[0].Id, "Numeric editing must retain connector identities.");
+            Check(ChartStorage.Serialize(spec) == original, "Waterfall editing before Apply must not mutate the source.");
+            string matrix = "Segment\tStart\tGrowth\tCosts\tSubtotal\tOther\tTotal\nA\t100\t35\t-12\te\t-5\te\nB\t\t\t-17\t\t\t";
+            var paste = typeof(WaterfallEditor).GetMethod("PasteMatrix", BindingFlags.Instance | BindingFlags.NonPublic);
+            paste.Invoke(editor, new object[] { matrix });
+            read = (ChartSpec)readMethod.Invoke(editor, null); solved = WaterfallSolver.Solve(read.Waterfall);
+            Check(solved.Columns[3].Output == 106 && solved.Columns[5].Output == 101, "Matrix paste must retain blanks and solve e cells.");
+            Check(read.Waterfall.Columns[2].Segments[1].Value == -17 && read.Waterfall.Columns[2].Segments[1].Id == spec.Waterfall.Columns[2].Segments[1].Id, "Paste must preserve stable segment identities.");
+            string before = ChartStorage.Serialize(read); bool failed = false;
+            try { paste.Invoke(editor, new object[] { "Segment\tA\nOne\tbad-number" }); } catch (TargetInvocationException) { failed = true; }
+            Check(failed && ChartStorage.Serialize((ChartSpec)readMethod.Invoke(editor, null)) == before, "Invalid pasted numbers must leave the grid intact.");
+            var signs = (CheckBox)typeof(WaterfallEditor).GetField("signs", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(editor);
+            var order = (ComboBox)typeof(WaterfallEditor).GetField("order", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(editor);
+            signs.Checked = true; order.SelectedIndex = 1;
+            read = (ChartSpec)readMethod.Invoke(editor, null);
+            Check(read.Waterfall.ShowSigns && read.Waterfall.SegmentOrder == "SheetBottomToTop", "Waterfall number signs and sheet order must persist.");
+        }
     }
 }

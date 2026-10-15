@@ -1,4 +1,4 @@
-# Suivi de parité
+﻿# Suivi de parité
 
 L'objectif final est la parité fonctionnelle et d'interaction avec think-cell. Un graphique d'apparence similaire ou un test interne réussi ne prouve pas cette parité. Référence initiale fournie : build 14.0.38.718 ; la documentation publique actuelle peut décrire une autre version.
 
@@ -11,7 +11,7 @@ Statuts : **prototype** = réalisation partielle testable ; **absent** = non ré
 | Ruban et insertion | Prototype | Reproduire workflows, placement interactif et raccourcis de référence |
 | Menu radial / contextuel | Absent | Corpus d'interactions sélection, poignées et propriétés |
 | Éditeur de données | Prototype | Matrice jusqu'à huit séries et cellules absentes ; formules et parité des interactions restantes |
-| Waterfall | Prototype | Totaux automatiques `e`, empilement, connecteurs modifiables, total à gauche |
+| Waterfall | Prototype | Segments multiples, `e`, contraintes exactes, connecteurs/ancrages modifiables et total à gauche réalisés ; poignées sur diapositive, ancrage physique des segments et règles automatiques restantes |
 | Colonnes et barres | Prototype | Groupées, empilées, 100 % et séries multiples réalisées ; un profil empilé comparé localement, généralisation et interactions restantes |
 | Courbes et aires | Prototype / absent | Courbes multi-séries avec interruption aux données absentes ; dates, aires et combinaisons restantes |
 | Secteurs et anneaux | Absent | Angles, trous, labels et petits segments |
@@ -66,3 +66,7 @@ Les captures de référence et leurs résultats restent séparés du code distri
 - [Disposition automatique](https://www.think-cell.com/en/resources/manual/automatic-layout)
 - [Compatibilité des présentations](https://www.think-cell.com/en/resources/manual/compatibility)
 - [API d'automatisation](https://www.think-cell.com/en/resources/manual/api)
+
+## Cascades à contraintes
+
+Le nouveau modèle résout des graphes explicites avec rationnels internes et conserve `e` comme inconnue. Quatre dispositions initiales sont proposées dans l’éditeur ; leur choix reste explicite. Les scénarios numériques issus du manuel sont couverts, mais les interactions et la topologie automatique générale ne sont pas reproduites. Voir [WATERFALL.md](WATERFALL.md).

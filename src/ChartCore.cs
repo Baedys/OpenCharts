@@ -12,6 +12,7 @@ namespace OpenSlideCharts
         public List<string> Series = new List<string>();
         public string LayoutMode = "Clustered";
         public ChartAppearance Appearance;
+        public WaterfallSpec Waterfall;
         public List<string> ImportWarnings = new List<string>();
     }
     public sealed class ChartRow
@@ -29,6 +30,7 @@ namespace OpenSlideCharts
         public double FontSize;
         public string FontName;
         public double LineWidth;
+        public int DashStyle;
         public string VerticalAlignment;
         public double? MarginLeft, MarginRight;
         public bool NoWrap;
@@ -70,7 +72,8 @@ namespace OpenSlideCharts
             Layout result = new Layout();
             if (spec.Appearance == null || spec.Appearance.ShowTitle)
                 Text(result, spec.Title ?? spec.Kind, 14, 8, width - 28, 28, 20, Ink, "left");
-            if (spec.Series != null && spec.Series.Count > 0) MultiSeries(result, spec, width, height);
+            if (spec.Waterfall != null) ConstraintWaterfall(result, spec, width, height);
+            else if (spec.Series != null && spec.Series.Count > 0) MultiSeries(result, spec, width, height);
             else if (kind == "mekko") Mekko(result, spec, width, height);
             else if (kind == "gantt" || kind == "bar") Horizontal(result, spec, width, height, kind == "gantt");
             else Vertical(result, spec, width, height, kind);
@@ -94,6 +97,12 @@ namespace OpenSlideCharts
             string kind = (spec.Kind ?? "").ToLowerInvariant();
             if (kind != "waterfall" && kind != "column" && kind != "bar" && kind != "line" && kind != "mekko" && kind != "gantt")
                 throw new NotSupportedException("Unsupported chart kind: " + spec.Kind + ". Supported: Waterfall, Column, Bar, Line, Mekko, Gantt.");
+            if (spec.Waterfall != null)
+            {
+                if (kind != "waterfall" || spec.Series != null && spec.Series.Count > 0 || spec.Appearance != null)
+                    throw new NotSupportedException("Constraint waterfalls require Kind=Waterfall without a series matrix or imported appearance.");
+                return;
+            }
             if (spec.Rows == null || spec.Rows.Count == 0 || spec.Rows.Count > 80)
                 throw new ArgumentException("Provide between 1 and 80 rows.", "spec");
             double running = 0;

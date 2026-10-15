@@ -1,20 +1,21 @@
-# Validation du jalon apparence et interopérabilité
+﻿# Validation du jalon cascades à contraintes
 
 Tests locaux réalisés le 15 octobre 2026, sous Windows avec PowerPoint/Excel de bureau x64, version Office 16.0.20430.20146.
 
 | Vérification | Résultat | Limite |
 |---|---|---|
-| Géométrie et validation des entrées | 3 098 assertions réussies | Ce nombre compte les assertions, pas les scénarios |
-| Préservation des données dans les éditeurs | 15 assertions réussies | Formulaires instanciés sans parcours interactif |
+| Géométrie et validation des entrées | 3 822 assertions réussies | Ce nombre compte les assertions, pas les scénarios |
+| Solveur de cascades | 21 scénarios, 169 assertions réussies | Six scénarios numériques du manuel ; topologie explicitement définie |
+| Préservation des données dans les éditeurs | 23 assertions réussies | Formulaires instanciés sans parcours interactif |
 | Lecteur et convertisseur Python | 58 tests réussis | Fixtures synthétiques, pas un corpus exhaustif |
-| Intégration Office avec un graphique converti | 181 assertions réussies, processus terminé avec code 0 | Une installation Office x64 locale |
+| Intégration Office avec un graphique converti | 399 assertions réussies, processus terminé avec code 0 | Une installation Office x64 locale |
 | Chargement COM/ruban | `connected=True; ribbon=True` | Les clics sur tous les boutons restent à tester |
 | Inspection des exemples fournis | 32 contrôles privés réussis, hashes inchangés | Trois présentations, cinq modèles de graphiques |
 | Bibliothèque de types native | 905 déclarations de fonctions et 11 GUIDs comparés, zéro divergence | Déclarations, pas 905 fonctionnalités utilisateur ; voir INTEROP.md |
 
-L'intégration vérifie les groupes de formes, les métadonnées, le remplacement transactionnel, la lecture et l'actualisation Excel, les matrices multi-séries et les données après réouverture. Sept variantes multi-séries sont couvertes : colonnes et barres groupées/empilées/100 %, courbe groupée. Un cas synthétique de 220 × 104 points vérifie le cadre importé et les positions/dimensions de chaque zone de texte, avant et après sauvegarde/réouverture. Les textes sans retour automatique à la ligne conservent leur géométrie.
+L'intégration vérifie les groupes de formes, les métadonnées, le remplacement transactionnel, la lecture et l'actualisation Excel, les matrices multi-séries et les données après réouverture. Sept variantes multi-séries sont couvertes : colonnes et barres groupées/empilées/100 %, courbe groupée. Un cas synthétique de 220 × 104 points vérifie le cadre importé et les positions/dimensions de chaque zone de texte, avant et après sauvegarde/réouverture. Les textes sans retour automatique à la ligne conservent leur géométrie. Trois cascades synthétiques ajoutent des segments multiples, des `e`, un total à gauche, des signes mixtes et un connecteur libre oblique. La suite vérifie le recalcul après remplacement, le refus transactionnel d’ancrages incompatibles et la conservation des données, contraintes et zones de texte après réouverture.
 
-Le test optionnel d'import utilise un JSON dérivé d'une présentation de référence locale. Le fichier d'origine, le JSON et le rendu de ce test ne sont pas publiés. La suite standard comporte 105 assertions ; le profil de référence testé avec `-InputJson` en ajoute 76. Le nombre ajouté dépend du nombre de textes du graphique. L'égalité des métadonnées compare les modèles sérialisés après désérialisation commune : l'ordre des propriétés d'un objet JSON n'est pas significatif.
+Le test optionnel d'import utilise un JSON dérivé d'une présentation de référence locale. Le fichier d'origine, le JSON et le rendu de ce test ne sont pas publiés. La suite standard comporte 323 assertions ; le profil de référence testé avec `-InputJson` en ajoute 76. Le nombre ajouté dépend du nombre de textes du graphique. L'égalité des métadonnées compare les modèles sérialisés après désérialisation commune : l'ordre des propriétés d'un objet JSON n'est pas significatif.
 
 ## Comparaison visuelle limitée
 
@@ -23,6 +24,12 @@ Une présentation de référence contenant un graphique empilé a été rendue p
 Une expérience séparée a vérifié les décalages des étiquettes du profil : rendre explicites les modes `factor` absents du fichier a produit zéro pixel différent ; remettre les neuf décalages à zéro a changé 939 pixels. Cela justifie l'interprétation de ces champs pour ce profil et cette version d'Office seulement. Le convertisseur conserve un avertissement correspondant.
 
 Ces observations portent sur le rendu PowerPoint des éléments enregistrés. Aucun exécutable ou complément think-cell n'a été installé ni exécuté pour ces vérifications. Elles ne démontrent pas une parité globale avec le produit.
+
+## Cascades
+
+Le calcul exact a été vérifié sur six exemples numériques du manuel et sur des cas supplémentaires : sommes indépendantes, calcul arrière, `e` avec segments numériques, ancrages sur segments, résidu de connecteur libre, valeurs décimales et extrêmes. Les images et données de référence restent privées. Les sorties numériques des exemples ne constituent pas une validation de la topologie automatique ni des interactions. Les trois rendus PowerPoint synthétiques ont été inspectés visuellement.
+
+La revue a fait corriger les collisions de lignes effectives entre anciens indices implicites et nouveaux `SheetRow` explicites, qui pouvaient écraser un segment dans la grille. Ces entrées sont refusées avant ouverture de l’éditeur. Le collage simple pendant l’édition d’une cellule est laissé au contrôle texte ; seuls les tableaux sont interceptés. Les tests d’éditeur couvrent les données et contraintes, le recalcul, les IDs stables, les cellules absentes et le refus d’un collage numérique invalide sans modification. Aucun parcours complet au clavier ou à la souris n’est revendiqué.
 
 ## Revue et corrections
 

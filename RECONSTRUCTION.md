@@ -1,4 +1,4 @@
-# Journal de reconstruction
+﻿# Journal de reconstruction
 
 ## Cible et méthode
 
@@ -75,3 +75,7 @@ L'architecture C# de ce dépôt est un choix de reconstruction : cœur géométr
 ## Règles de contribution
 
 Les implémentations sont originales. Toute affirmation de parité exige une observation de référence et un test comparatif. Les sources, ressources visuelles, installateurs et DLL de think-cell ne sont pas redistribués avec le projet. Le pseudocode d'analyse n'est pas incorporé dans les sources MIT.
+
+## Cascades
+
+Le jalon suivant ajoute un solveur original de contraintes exactes et un modèle distinct pour les cascades multi-segments. Les faits du manuel livré et les dispositions proposées sont consignés dans [WATERFALL.md](WATERFALL.md). Les ancrages explicites restent la source du calcul ; aucun algorithme général de placement ou de résolution des conflits du binaire n’est revendiqué. Les tests numériques, d’édition et de persistance PowerPoint sont décrits dans [VALIDATION.md](VALIDATION.md).

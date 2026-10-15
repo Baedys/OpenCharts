@@ -6,6 +6,7 @@ Complément PowerPoint Windows open source, sous licence MIT. Le complément s'i
 
 - Ruban PowerPoint avec insertion et modification de graphiques.
 - Six moteurs de géométrie : cascade, colonnes, barres, courbe, Mekko à deux segments et Gantt en jours relatifs.
+- Cascades multi-segments avec valeurs calculées `e`, connecteurs et ancrages modifiables ; calcul exact des contraintes.
 - Colonnes/barres groupées, empilées et 100 %, courbes multi-séries ; jusqu'à huit séries avec cellules absentes.
 - Import d'une partie vérifiée de l'apparence des colonnes empilées : palette, ordre, polices, échelle, géométrie et étiquettes liées au modèle.
 - Rendu en groupes de formes et textes PowerPoint ordinaires ; les présentations restent visibles sans complément.
@@ -56,6 +57,10 @@ Pour modifier, sélectionner le groupe entier et choisir **Modifier les données
 
 **Multi-séries** ouvre un éditeur de matrice : première colonne = catégories, autres colonnes = séries. Le collage attend une première ligne d'en-têtes. Une cellule vide reste absente ; une courbe s'interrompt à cet endroit. Les empilements positifs et négatifs ont des bases séparées ; le mode 100 % accepte uniquement des valeurs positives ou nulles. Les liens Excel multi-séries ne sont pas encore disponibles : utiliser le collage ou **Importer JSON** avec le résultat du convertisseur ci-dessous.
 
+Le bouton **Cascade** utilise un éditeur dédié : catégories en colonnes, segments en lignes, cellules `e` recalculées. Les onglets Connecteurs et Ancrages modifient les liens et niveaux imposés. Le bouton **Recréer les liens** applique une disposition choisie ; les modifications numériques conservent les contraintes existantes. Voir [WATERFALL.md](WATERFALL.md) pour les quatre dispositions et limites. Les anciens graphiques de cascade restent éditables dans leur format initial. Un [exemple JSON synthétique](examples/WaterfallConstraints.json) peut être ouvert avec **Importer JSON**.
+
+![Cascade synthétique rendue par OpenCharts](examples/WaterfallConstraints.png)
+
 ## Limites importantes
 
 Cette version n'édite pas les objets propriétaires think-cell et ne reproduit pas ses menus contextuels ni son placement automatique. Le moteur ne gère pas encore les secteurs/anneaux, les graphiques combinés, les dates calendaires ou les ruptures d'axe. L'actualisation n'est pas automatique et ne lit pas les modifications Excel non enregistrées.
@@ -68,7 +73,7 @@ La réédition régénère les formes ; les personnalisations manuelles et anima
 
 Les tests d'intégration distribués nécessitent Office installé et utilisent des documents synthétiques. Des comparaisons privées supplémentaires portent sur un profil de colonnes empilées, décrit dans [RECONSTRUCTION.md](RECONSTRUCTION.md). Elles ne démontrent ni parité visuelle globale ni parité des interactions.
 
-Résultats et limites détaillés dans [VALIDATION.md](VALIDATION.md) : **3 098 assertions moteur, 15 assertions d’éditeur, 58 tests Python et 181 contrôles Office** avec le profil de référence optionnel. Sur ce profil empilé, les bords des neuf segments reconstruits diffèrent au plus d’un pixel à 1440 × 810. Ce résultat limité ne couvre pas toutes les étiquettes ni les interactions.
+Résultats et limites détaillés dans [VALIDATION.md](VALIDATION.md) : **3 822 assertions moteur, 169 assertions du solveur de cascades, 23 assertions d’éditeur, 58 tests Python et 399 contrôles Office** avec le profil de référence optionnel. Sur ce profil empilé, les bords des neuf segments reconstruits diffèrent au plus d’un pixel à 1440 × 810. Ce résultat limité ne couvre pas toutes les étiquettes ni les interactions.
 
 Après installation, fermer PowerPoint puis lancer `Test-Office.ps1`. Le script démarre PowerPoint normalement avant de piloter les tests : un démarrage Office réservé à l'automatisation peut omettre les compléments utilisateur. Les tests Excel créent leur propre instance. Les callbacks interactifs et Undo/Redo restent à vérifier. L'option `-InputJson chemin.json` ajoute un test de rendu et de persistance d'un graphique converti ; son résultat reste local.
 
@@ -80,6 +85,8 @@ Après installation, fermer PowerPoint puis lancer `Test-Office.ps1`. Le script 
 - `src/OfficeAdapter.cs` : formes PowerPoint, persistance et lecture Excel.
 - `src/ChartEditor.cs` : éditeur WinForms.
 - `src/SeriesEditor.cs` : éditeur de matrice.
+- `src/WaterfallModel.cs`, `WaterfallSolver.cs`, `WaterfallChart.cs` : modèle, résolution exacte et rendu des cascades.
+- `src/WaterfallEditor.cs` : données, connecteurs et ancrages de cascade.
 - `src/Connect.cs` : interfaces COM et ruban.
 - `tests/` : tests du moteur et intégration Office.
 

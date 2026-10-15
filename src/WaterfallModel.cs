@@ -1,0 +1,125 @@
+using System;
+using System.Collections.Generic;
+
+namespace OpenSlideCharts
+{
+    // Original, explicit graph model. Automatic connector topology is not inferred.
+    public sealed class WaterfallSpec
+    {
+        public List<WaterfallColumn> Columns = new List<WaterfallColumn>();
+        public List<WaterfallConnector> Connectors = new List<WaterfallConnector>();
+        public List<WaterfallPin> Pins = new List<WaterfallPin>();
+        public string SegmentOrder = "SheetTopToBottom";
+        public bool ShowSigns;
+    }
+
+    public sealed class WaterfallColumn
+    {
+        public string Id, Label;
+        public List<WaterfallSegment> Segments = new List<WaterfallSegment>();
+    }
+
+    public sealed class WaterfallSegment
+    {
+        public string Id;
+        // Stable datasheet row; -1 preserves list-position semantics for legacy data.
+        public int SheetRow = -1;
+        public double? Value;
+        public bool Calculated;
+    }
+
+    public sealed class WaterfallAnchor
+    {
+        public string ColumnId;
+        // Coordinate = column base + sum(Weights[i] * segment value[i]).
+        public List<double> Weights = new List<double>();
+
+        public static WaterfallAnchor AtBase(WaterfallColumn column)
+        {
+            return ConstantWeights(column, 0);
+        }
+
+        public static WaterfallAnchor AtOutput(WaterfallColumn column)
+        {
+            return ConstantWeights(column, 1);
+        }
+
+        private static WaterfallAnchor ConstantWeights(WaterfallColumn column, double weight)
+        {
+            if (column == null || column.Segments == null) throw new ArgumentException("Column and segments are required.");
+            WaterfallAnchor anchor = new WaterfallAnchor { ColumnId = column.Id };
+            foreach (WaterfallSegment ignored in column.Segments) anchor.Weights.Add(weight);
+            return anchor;
+        }
+
+        public static WaterfallAnchor ForWeights(string columnId, params double[] weights)
+        {
+            if (weights == null) throw new ArgumentException("Anchor weights are required.");
+            return new WaterfallAnchor { ColumnId = columnId, Weights = new List<double>(weights) };
+        }
+    }
+
+    public sealed class WaterfallConnector
+    {
+        public string Id;
+        public WaterfallAnchor Left, Right;
+        public bool Constrain = true;
+    }
+
+    public sealed class WaterfallPin
+    {
+        public string Id;
+        public WaterfallAnchor Anchor;
+        public double Level;
+    }
+
+    public enum WaterfallSolveFailure { Inconsistent, Underdetermined }
+
+    public sealed class WaterfallSolveException : InvalidOperationException
+    {
+        public WaterfallSolveFailure Failure { get; private set; }
+        public List<string> FreeVariables { get; private set; }
+
+        internal WaterfallSolveException(WaterfallSolveFailure failure, string message, List<string> freeVariables)
+            : base(message)
+        {
+            Failure = failure;
+            FreeVariables = freeVariables ?? new List<string>();
+        }
+    }
+
+    public sealed class WaterfallSolution
+    {
+        public List<WaterfallColumnSolution> Columns = new List<WaterfallColumnSolution>();
+        public List<WaterfallConnectorSolution> Connectors = new List<WaterfallConnectorSolution>();
+
+        public WaterfallColumnSolution FindColumn(string columnId)
+        {
+            foreach (WaterfallColumnSolution column in Columns)
+                if (String.Equals(column.ColumnId, columnId, StringComparison.Ordinal)) return column;
+            throw new ArgumentException("Unknown waterfall column: " + columnId);
+        }
+    }
+
+    public sealed class WaterfallColumnSolution
+    {
+        public string ColumnId, Label;
+        public double Base, Output;
+        public List<WaterfallSegmentSolution> Segments = new List<WaterfallSegmentSolution>();
+    }
+
+    public sealed class WaterfallSegmentSolution
+    {
+        public string Id;
+        public int SheetRow = -1;
+        public bool Calculated;
+        public double Value, Start, End, Bottom, Top, Extent;
+    }
+
+    public sealed class WaterfallConnectorSolution
+    {
+        public string Id, LeftColumnId, RightColumnId;
+        public double LeftLevel, RightLevel, Residual;
+        public bool Skew, Constrained;
+    }
+}

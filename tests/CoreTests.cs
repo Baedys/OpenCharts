@@ -14,7 +14,7 @@ public static class CoreTests
                 Bounds(ChartEngine.Build(ChartSamples.Create(kind), 640, 360), 640, 360);
                 Bounds(ChartEngine.Build(ChartSamples.Create(kind), 320, 240), 320, 240);
             }
-            Waterfall(); SignedColumn(); Mekko(); Gantt(); Extremes(); Validation(); Series(); Appearance();
+            Waterfall(); SignedColumn(); Mekko(); Gantt(); Extremes(); Validation(); Series(); Appearance(); ConstraintCascades();
             Console.WriteLine("PASS: " + assertions + " assertions"); return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex.ToString()); return 1; }
@@ -199,6 +199,43 @@ public static class CoreTests
             Check(p.X + p.W >= -.00001 && p.Y + p.H >= -.00001 && p.X + p.W <= w + .00001 && p.Y + p.H <= h + .00001, "End in bounds");
             if (p.Kind != "line") Check(p.W >= 0 && p.H >= 0, "Nonnegative sizes");
         }
+    }
+    private static void ConstraintCascades()
+    {
+        var sample = WaterfallProfiles.Sample();
+        Bounds(ChartEngine.Build(sample, 640, 360), 640, 360);
+        List<Primitive> segments = Rects(ChartEngine.Build(sample, 640, 360));
+        Check(segments[2].Color != segments[3].Color, "Different segment rows must remain visually distinguishable.");
+        Bounds(ChartEngine.Build(sample, 320, 240), 320, 240);
+        var solved = WaterfallSolver.Solve(sample.Waterfall);
+        Near(solved.Columns[3].Output, 106); Near(solved.Columns[5].Output, 101);
+        sample.Waterfall.Connectors.RemoveAt(0);
+        sample.Waterfall.Pins.Add(WaterfallProfiles.Pin(WaterfallAnchor.AtBase(sample.Waterfall.Columns[1]), 0));
+        solved = WaterfallSolver.Solve(sample.Waterfall);
+        Near(solved.Columns[3].Output, 6); Near(solved.Columns[5].Output, 1);
+        Bounds(ChartEngine.Build(sample, 640, 360), 640, 360);
+        var left = new ChartSpec { Kind = "Waterfall", Waterfall = new WaterfallSpec() };
+        for (int c = 0; c < 4; c++)
+        {
+            var column = new WaterfallColumn { Id = "C" + c, Label = "Category " + c };
+            column.Segments.Add(new WaterfallSegment { Id = "S" + c, SheetRow = 0, Calculated = c == 0, Value = c == 0 ? (double?)null : c == 1 ? 3 : c == 2 ? 2 : 4 });
+            left.Waterfall.Columns.Add(column);
+        }
+        WaterfallProfiles.Arrange(left.Waterfall, "EndAtZero");
+        Near(WaterfallSolver.Solve(left.Waterfall).Columns[0].Output, -9);
+        Bounds(ChartEngine.Build(left, 640, 360), 640, 360);
+        WaterfallProfiles.Arrange(left.Waterfall, "LeftTotal");
+        Near(WaterfallSolver.Solve(left.Waterfall).Columns[0].Output, 9);
+        Layout drawn = ChartEngine.Build(left, 640, 360); Bounds(drawn, 640, 360);
+        int dashed = 0; foreach (Primitive p in drawn.Items) if (p.Kind == "line" && p.DashStyle == 4) dashed++;
+        Check(dashed == 3, "Explicit connector topology must render all dashed connectors.");
+        WaterfallProfiles.Arrange(left.Waterfall, "Backward");
+        Near(WaterfallSolver.Solve(left.Waterfall).Columns[0].Output, 9);
+        left.Waterfall.Connectors.Add(new WaterfallConnector { Id = "free", Left = WaterfallAnchor.AtBase(left.Waterfall.Columns[0]), Right = WaterfallAnchor.AtOutput(left.Waterfall.Columns[3]), Constrain = false });
+        drawn = ChartEngine.Build(left, 640, 360);
+        bool skew = false; foreach (Primitive p in drawn.Items) if (p.Kind == "line" && p.DashStyle == 4 && p.Color == ChartEngine.Red && p.H != 0) skew = true;
+        Check(skew, "Free connector residual must render as a skew line.");
+        Bounds(drawn, 640, 360);
     }
     private static bool Finite(double n) { return !Double.IsNaN(n) && !Double.IsInfinity(n); }
     private static void Near(double a, double b) { Check(Math.Abs(a - b) < .00001, "Expected " + b + ", got " + a); }

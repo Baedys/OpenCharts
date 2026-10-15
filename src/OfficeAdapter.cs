@@ -83,6 +83,7 @@ namespace OpenSlideCharts
                         s = slide.Shapes.AddLine((float)(left + p.X), (float)(top + p.Y), (float)(left + p.X + p.W), (float)(top + p.Y + p.H));
                         s.Line.ForeColor.RGB = p.Color;
                         s.Line.Weight = (float)(p.LineWidth > 0 ? p.LineWidth : 1.3);
+                        if (p.DashStyle > 0) s.Line.DashStyle = p.DashStyle;
                     }
                     else if (p.Kind == "text")
                     {
@@ -155,6 +156,7 @@ namespace OpenSlideCharts
         }
         public static ChartSpec Read(ChartSpec source)
         {
+            if (source != null && source.Waterfall != null) throw new NotSupportedException("Les liens Excel des cascades à connecteurs ne sont pas encore pris en charge. Utilisez le collage dans l'éditeur de cascade.");
             if (source != null && source.Series != null && source.Series.Count > 0) throw new NotSupportedException("Les liens Excel multi-séries ne sont pas encore pris en charge. Utilisez le collage de matrice dans l'éditeur.");
             if (source == null || String.IsNullOrWhiteSpace(source.WorkbookPath) || String.IsNullOrWhiteSpace(source.Worksheet) || String.IsNullOrWhiteSpace(source.RangeAddress)) throw new ArgumentException("Indiquez fichier Excel, feuille et plage sans en-tête (A2:D8, par exemple).");
             if (!File.Exists(source.WorkbookPath)) throw new FileNotFoundException("Classeur absent ; les données embarquées sont conservées.", source.WorkbookPath);

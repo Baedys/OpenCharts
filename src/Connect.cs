@@ -70,6 +70,7 @@ namespace OpenSlideCharts
             {
                 dynamic slide = ActiveSlide();
                 string kind = (string)((dynamic)control).Tag;
+                if (kind == "Waterfall") { InsertSpec(WaterfallProfiles.Sample()); return; }
                 using (ChartEditor editor = new ChartEditor(ChartSamples.Create(kind)))
                 {
                     if (editor.ShowDialog() != DialogResult.OK) return;
@@ -96,6 +97,10 @@ namespace OpenSlideCharts
         }
         private static ChartSpec EditSpec(ChartSpec source, double? width = null, double? height = null)
         {
+            if (source.Waterfall != null)
+            {
+                using (var editor = new WaterfallEditor(source, width, height)) return editor.ShowDialog() == DialogResult.OK ? editor.Spec : null;
+            }
             if (source.Series != null && source.Series.Count > 0)
             {
                 using (var editor = new SeriesEditor(source, width, height)) return editor.ShowDialog() == DialogResult.OK ? editor.Spec : null;

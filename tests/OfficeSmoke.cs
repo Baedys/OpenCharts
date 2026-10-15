@@ -122,7 +122,23 @@ public static class OfficeSmoke
                 CategoryLabelGap = 2, TotalLabelGap = 2, SeriesLabelGap = 23.3333333333,
                 SeriesLabelHeight = 10, CategoryLabelHeight = 10, TotalLabelHeight = 10, GapRatio = .5
             };
-            var imports = new List<ChartSpec> { styled };
+            var cascade = WaterfallProfiles.Sample();
+            var leftTotal = ChartStorage.Clone(cascade);
+            leftTotal.Waterfall.Columns[0].Segments[0].Value = null; leftTotal.Waterfall.Columns[0].Segments[0].Calculated = true;
+            leftTotal.Waterfall.Columns[3].Segments[0].Value = 15; leftTotal.Waterfall.Columns[3].Segments[0].Calculated = false;
+            leftTotal.Waterfall.Columns[5].Segments[0].Value = 4; leftTotal.Waterfall.Columns[5].Segments[0].Calculated = false;
+            leftTotal.Title = "Total à gauche"; WaterfallProfiles.Arrange(leftTotal.Waterfall, "LeftTotal");
+            var mixed = new ChartSpec { Kind = "Waterfall", Title = "Signes mixtes", Waterfall = new WaterfallSpec { ShowSigns = true } };
+            for (int c = 0; c < 3; c++)
+            {
+                var column = new WaterfallColumn { Id = "mixed_" + c, Label = "Catégorie " + c };
+                column.Segments.Add(new WaterfallSegment { Id = "mixed_value_" + c, SheetRow = 0, Value = c == 2 ? (double?)null : c == 0 ? 3 : 5, Calculated = c == 2 });
+                if (c == 1) column.Segments.Add(new WaterfallSegment { Id = "negative", SheetRow = 1, Value = -2 });
+                mixed.Waterfall.Columns.Add(column);
+            }
+            WaterfallProfiles.Arrange(mixed.Waterfall, "Forward");
+            mixed.Waterfall.Connectors.Add(new WaterfallConnector { Id = "skew", Left = WaterfallAnchor.AtBase(mixed.Waterfall.Columns[0]), Right = WaterfallAnchor.AtOutput(mixed.Waterfall.Columns[2]), Constrain = false });
+            var imports = new List<ChartSpec> { styled, cascade, leftTotal, mixed };
             for (int argument = 1; argument + 1 < args.Length; argument++)
             {
                 if (args[argument] != "--input-json") continue;
@@ -138,6 +154,18 @@ public static class OfficeSmoke
                 matrices[index] = ChartStorage.Serialize(imported);
                 Check(ChartStorage.Serialize(ChartStorage.Read((object)shape)) == matrices[index], "Imported matrix metadata mismatch.");
                 CheckTextBounds((object)shape, imported, frame);
+                if (imported == cascade)
+                {
+                    imported.Waterfall.Columns[1].Segments[0].Value = 40;
+                    shape = OfficeRenderer.Replace((object)slide, (object)shape, imported);
+                    Check(WaterfallSolver.Solve(ChartStorage.Read((object)shape).Waterfall).Columns[5].Output == 106, "Waterfall e was not recalculated after replacement.");
+                    var conflicting = ChartStorage.Clone(imported);
+                    conflicting.Waterfall.Pins.Add(WaterfallProfiles.Pin(WaterfallAnchor.AtBase(conflicting.Waterfall.Columns[0]), 1));
+                    bool conflict = false;
+                    try { OfficeRenderer.Replace((object)slide, (object)shape, conflicting); } catch (WaterfallSolveException) { conflict = true; }
+                    Check(conflict && (int)slide.Shapes.Count == 1, "Conflicting waterfall replacement destroyed chart.");
+                    matrices[index] = ChartStorage.Serialize(imported);
+                }
                 slide.Export(Path.Combine(output, "ImportedData-" + index + ".png"), "PNG", 1440, 810);
             }
             int slideCount = (int)deck.Slides.Count;
@@ -149,7 +177,7 @@ public static class OfficeSmoke
             {
                 dynamic slide = deck.Slides.Item(i); dynamic group = slide.Shapes.Item(1);
                 ChartSpec spec = ChartStorage.Read((object)group);
-                Check(spec.Rows.Count > 0, "Missing data after reopening.");
+                Check(spec.Waterfall != null ? spec.Waterfall.Columns.Count > 0 : spec.Rows.Count > 0, "Missing data after reopening.");
                 Check(Math.Abs((double)group.Width - (frames.ContainsKey(i) ? frames[i].Width : 900)) < .02, "Group bounds changed.");
                 if (matrices.ContainsKey(i))
                 {
