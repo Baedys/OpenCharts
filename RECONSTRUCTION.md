@@ -1,4 +1,4 @@
-﻿# Journal de reconstruction
+# Journal de reconstruction
 
 ## Cible et méthode
 
@@ -62,7 +62,7 @@ Ces identifiants référencent les preuves de la session d'analyse. Les bundles 
 
 ## Inférences et inconnues
 
-Les tables MSI, exports COM et chaînes d'interface étayent une architecture de complément Office natif. Une partie du modèle de persistance est décodée sur le corpus ci-dessus. Le moteur original de placement, les contraintes de cascade, les règles de migration et les comportements d'actualisation restent à établir. L'analyse Ghidra approfondie est en cours ; aucun résultat non obtenu n'est revendiqué.
+Les tables MSI, exports COM et chaînes d'interface étayent une architecture de complément Office natif. Une partie du modèle de persistance est décodée sur le corpus ci-dessus. Le moteur original de placement, les priorités des contraintes de cascade, les règles générales de migration et les comportements d'actualisation restent à établir. Les analyses Ghidra ciblées disponibles sont distinguées ci-dessous des comportements encore inconnus.
 
 L'architecture C# de ce dépôt est un choix de reconstruction : cœur géométrique indépendant, adaptateur Office, groupes de formes natives et modèle de données versionné. Elle ne prétend pas être l'architecture interne de think-cell. Les métadonnées `OSC_*` sont propres à ce projet et ne constituent pas une implémentation du format think-cell.
 
@@ -79,3 +79,23 @@ Les implémentations sont originales. Toute affirmation de parité exige une obs
 ## Cascades
 
 Le jalon suivant ajoute un solveur original de contraintes exactes et un modèle distinct pour les cascades multi-segments. Les faits du manuel livré et les dispositions proposées sont consignés dans [WATERFALL.md](WATERFALL.md). Les ancrages explicites restent la source du calcul ; aucun algorithme général de placement ou de résolution des conflits du binaire n’est revendiqué. Les tests numériques, d’édition et de persistance PowerPoint sont décrits dans [VALIDATION.md](VALIDATION.md).
+
+## Analyse native ciblée des ancrages de cascade
+
+Sept dossiers supplémentaires ont été obtenus le 16 octobre 2026 sur la DLL x64 identifiée plus haut, avec Ghidra 12.1.4. Les exports de preuves et le snapshot restent privés ; la session a été fermée proprement. Aucun installateur ou code cible n'a été exécuté par cette analyse, et aucun pseudo-code décompilé n'est inclus dans le dépôt.
+
+Les fonctions de sérialisation/lecture `0x1818e0980` et `0x1818e6a20` confirment trois références persistées distinctes : `BaselinePriLow`, `BaselineVectorConnector` et `BaselinePriHigh`. Le chemin de lecture de `m_eground` accepte les octets 255, 0, 1, 2 et 3. Le sens de ces valeurs et leur correspondance avec les commandes utilisateur ne sont pas établis. Les noms de champs ne prouvent aucun ordre de priorité lors du calcul.
+
+Le helper `0x181a8cd90` enregistre un offset par variable. Il appelle deux diagnostics concernant doublons et tolérance, puis le flux visible continue : ces assertions ne prouvent donc pas un rejet strict. Un appelant associé à `PostLoad` enregistre une différence seulement sous tolérance ; une réconciliation après chargement est une inférence. Un autre appelant initialise plusieurs offsets à zéro et parcourt deux états, sans preuve que ceux-ci désignent Sommet/Pied ou des niveaux de priorité. Aucune nouvelle règle produit n'est tirée de ces seuls dossiers.
+
+| Dossier | Adresse canonique | Evidence ID |
+| --- | --- | --- |
+| Diagnostic A | `0x1802ea830` | `ev_c9e15a58f2725ee94a3132582b21d7ef4ab528be7293d659e8395c6495475e43` |
+| Diagnostic B | `0x1802ea8a0` | `ev_784bec4c85a580243c1e625db9d27a22024354a1ee3e3af413e7f1e5f1592928` |
+| Écriture des références | `0x1818e0980` | `ev_def11988ff3724577e56690894637b971a18c76eb016208650c792527a087997` |
+| Lecture des références | `0x1818e6a20` | `ev_bbfa66cfdf6f398ee2e4c2fa8825d692fb4730ae3b4e29f10fdee355742696b1` |
+| Enregistrement d'offset | `0x181a8cd90` | `ev_f7597df5408940a2b8d44e5832abab347a3220fb099c6ea9df48464c77741bdd` |
+| Appelant PostLoad | `0x1819af6a0` | `ev_9a7ea6ab5c02327339be624cee6b71f68648958090d4a6ee3dfda75f0764a773` |
+| Appelant à deux états | `0x1819e73a0` | `ev_e481d0a1de6e6d67cd50d27f03d76f48ba04088abcbe681c63d7178ab7d4ef53` |
+
+La requête initiale `0x1818e0b6f` a été résolue à l'entrée canonique `0x1818e0980`. Types et signatures sont inférés, sans PDB. Les appels indirects restent partiellement non résolus ; des hypothèses de fonctions sans retour peuvent retirer des branches. L'extraction de p-code du plus gros appelant est tronquée, donc aucune preuve complète de flux entre fonctions n'est revendiquée. Choix de l'extrémité initiale, précédence des ancrages et traitement général des conflits restent inconnus.
