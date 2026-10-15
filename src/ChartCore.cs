@@ -34,6 +34,7 @@ namespace OpenSlideCharts
         public string VerticalAlignment;
         public double? MarginLeft, MarginRight;
         public bool NoWrap;
+        public string Role, EntityId, ColumnId, SegmentId;
     }
     public sealed class Layout
     {

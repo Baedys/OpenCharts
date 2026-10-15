@@ -1,4 +1,4 @@
-﻿# Validation du jalon cascades à contraintes
+# Validation du jalon connecteurs sur diapositive
 
 Tests locaux réalisés le 15 octobre 2026, sous Windows avec PowerPoint/Excel de bureau x64, version Office 16.0.20430.20146.
 
@@ -6,7 +6,11 @@ Tests locaux réalisés le 15 octobre 2026, sous Windows avec PowerPoint/Excel d
 |---|---|---|
 | Géométrie et validation des entrées | 3 822 assertions réussies | Ce nombre compte les assertions, pas les scénarios |
 | Solveur de cascades | 21 scénarios, 169 assertions réussies | Six scénarios numériques du manuel ; topologie explicitement définie |
-| Préservation des données dans les éditeurs | 23 assertions réussies | Formulaires instanciés sans parcours interactif |
+| Géométrie et mutations des connecteurs | 12 scénarios, 363 assertions réussies | Cibles physiques, ambiguïtés, contraintes manuelles et rollback ; pas de gestes UI |
+| Pont d’événements COM | 55 contrôles gérés réussis | Cycle de vie testé sans Office ; transport réel couvert séparément |
+| Minuteur de thread | 16 contrôles réussis | STA local pompé, sans HWND ; exécution Office couverte séparément |
+| Interactions Office | 29 assertions réussies, processus terminé avec code 0 | Formes natives et événements COM ; pas de glissement de souris injecté |
+| Préservation des données dans les éditeurs | 25 assertions réussies | Formulaires instanciés sans parcours interactif |
 | Lecteur et convertisseur Python | 58 tests réussis | Fixtures synthétiques, pas un corpus exhaustif |
 | Intégration Office avec un graphique converti | 399 assertions réussies, processus terminé avec code 0 | Une installation Office x64 locale |
 | Chargement COM/ruban | `connected=True; ribbon=True` | Les clics sur tous les boutons restent à tester |
@@ -31,6 +35,14 @@ Le calcul exact a été vérifié sur six exemples numériques du manuel et sur 
 
 La revue a fait corriger les collisions de lignes effectives entre anciens indices implicites et nouveaux `SheetRow` explicites, qui pouvaient écraser un segment dans la grille. Ces entrées sont refusées avant ouverture de l’éditeur. Le collage simple pendant l’édition d’une cellule est laissé au contrôle texte ; seuls les tableaux sont interceptés. Les tests d’éditeur couvrent les données et contraintes, le recalcul, les IDs stables, les cellules absentes et le refus d’un collage numérique invalide sans modification. Aucun parcours complet au clavier ou à la souris n’est revendiqué.
 
+## Connecteurs sur la diapositive
+
+`Test-Interactions.ps1` charge le complément réel puis modifie les connecteurs natifs par le modèle objet PowerPoint. Il vérifie la sélection d'un enfant de groupe, le rattachement d'une extrémité, le recalcul de `e` sans figer sa valeur, les ancrages automatiques, le recalcul automatique par minuteur, la sauvegarde/réouverture et l'absence de formes auxiliaires. Il couvre aussi la suppression native d'un connecteur, la navigation immédiate vers une autre diapositive, la suppression du groupe ou de la diapositive et l'entrée dans un ancien graphique sans tags sémantiques. Les 29 assertions ne représentent pas 29 gestes de souris ni une comparaison d'interaction avec think-cell.
+
+La revue a fait corriger la provenance des ancrages : modifier dans la grille un ancrage créé par un profil le rend manuel, pour éviter son retrait lors d'une réparation automatique ultérieure. L'activation des anciens groupes et la régénération protègent les callbacks de sélection réentrants. Les appels COM externes restent sur le STA du complément avec `StandardOleMarshalObject`. Le minuteur Win32 de thread remplace les tentatives d'accès à `HWND`, refusées par IDispatch sur l'hôte testé.
+
+Les probes de sauvegarde ont observé `BeforeSave` pendant `Save()`, mais aucun callback pendant les appels COM `SaveAs` et `SaveCopyAs` testés. Aucun auxiliaire d'édition n'est donc inséré dans le document. Une sauvegarde automatisée avant validation d'un déplacement peut toujours conserver une géométrie non synchronisée : terminer d'abord la session. Voir [INTERACTION.md](INTERACTION.md).
+
 ## Revue et corrections
 
 La revue indépendante en lecture seule a conduit à corriger les débordements hors cadre, le support des petits cadres explicites, le transfert des décalages d'étiquettes, la validation des indices de rôles et le refus des transformations ou styles typographiques non pris en charge. Les changements de type sont validés aux dimensions réelles avant fermeture de l'éditeur. Un petit graphique peut conserver son profil importé ; passer à la disposition standard exige d'abord un groupe d'au moins 320 × 240 points.
@@ -40,6 +52,7 @@ Le collage valide les données avant de changer la grille ; l'application valide
 ## Restant à vérifier
 
 - Parcours réels des éditeurs, collage pendant l'édition d'une cellule et commandes du ruban.
+- Menus contextuels, choix et annulation d'ancrages ambigus par gestes réels ; glissement de souris et comportement pendant un drag prolongé.
 - Undo/Redo, copie interprésentations, modifications manuelles et autres versions d'Office.
 - Erreurs de formules Excel et classeurs complexes.
 - Formats think-cell absents des références, placement automatique et fidélité de leur apparence.

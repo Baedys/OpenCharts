@@ -75,12 +75,15 @@ namespace OpenSlideCharts
                 bounds.Fill.Solid();
                 bounds.Fill.Transparency = 1f;
                 bounds.Line.Visible = 0;
-                foreach (Primitive p in layout.Items)
+                for (int itemIndex = 0; itemIndex < layout.Items.Count; itemIndex++)
                 {
+                    Primitive p = layout.Items[itemIndex];
                     dynamic s;
                     if (p.Kind == "line")
                     {
-                        s = slide.Shapes.AddLine((float)(left + p.X), (float)(top + p.Y), (float)(left + p.X + p.W), (float)(top + p.Y + p.H));
+                        if (p.Role == "WATERFALL_CONNECTOR")
+                            s = slide.Shapes.AddConnector(1, (float)(left + p.X), (float)(top + p.Y), (float)(left + p.X + p.W), (float)(top + p.Y + p.H));
+                        else s = slide.Shapes.AddLine((float)(left + p.X), (float)(top + p.Y), (float)(left + p.X + p.W), (float)(top + p.Y + p.H));
                         s.Line.ForeColor.RGB = p.Color;
                         s.Line.Weight = (float)(p.LineWidth > 0 ? p.LineWidth : 1.3);
                         if (p.DashStyle > 0) s.Line.DashStyle = p.DashStyle;
@@ -111,6 +114,11 @@ namespace OpenSlideCharts
                     }
                     else throw new NotSupportedException("Primitive inconnue : " + p.Kind);
                     s.Name = prefix + names.Count.ToString(CultureInfo.InvariantCulture);
+                    if (!String.IsNullOrEmpty(p.Role))
+                    {
+                        s.Tags.Add("OSC_ITEM", itemIndex.ToString(CultureInfo.InvariantCulture));
+                        s.Tags.Add("OSC_ROLE", p.Role);
+                    }
                     names.Add((string)s.Name);
                 }
                 object[] indices = names.ConvertAll<object>(delegate(string n) { return n; }).ToArray();
@@ -127,12 +135,14 @@ namespace OpenSlideCharts
             }
         }
         public static object Replace(object slideObject, object oldObject, ChartSpec spec)
+        { return Replace(slideObject, oldObject, spec, null); }
+        public static object Replace(object slideObject, object oldObject, ChartSpec spec, ChartRectangle frame)
         {
             dynamic old = oldObject;
             // Rotated groups cannot be regenerated without changing their local axes yet.
             if (Math.Abs((double)old.Rotation) > .01) throw new NotSupportedException("Remettez la rotation du groupe à 0° avant de l'actualiser.");
             int position = old.ZOrderPosition;
-            dynamic fresh = Render(slideObject, spec, (double)old.Left, (double)old.Top, (double)old.Width, (double)old.Height);
+            dynamic fresh = Render(slideObject, spec, frame == null ? (double)old.Left : frame.X, frame == null ? (double)old.Top : frame.Y, frame == null ? (double)old.Width : frame.Width, frame == null ? (double)old.Height : frame.Height);
             try
             {
                 while ((int)fresh.ZOrderPosition > position) fresh.ZOrder(3);

@@ -1,4 +1,4 @@
-﻿# OpenCharts
+# OpenCharts
 
 Complément PowerPoint Windows open source, sous licence MIT. Le complément s'inscrit actuellement sous le nom **OpenSlideCharts**. Objectif de recherche et de développement : reproduire les fonctionnalités et interactions de think-cell. **La parité n'est pas atteinte. Ce dépôt contient un prototype fonctionnel, pas un remplacement complet.**
 
@@ -7,6 +7,7 @@ Complément PowerPoint Windows open source, sous licence MIT. Le complément s'i
 - Ruban PowerPoint avec insertion et modification de graphiques.
 - Six moteurs de géométrie : cascade, colonnes, barres, courbe, Mekko à deux segments et Gantt en jours relatifs.
 - Cascades multi-segments avec valeurs calculées `e`, connecteurs et ancrages modifiables ; calcul exact des contraintes.
+- Édition des connecteurs sur la diapositive : poignées natives, rattachement aux niveaux de colonnes/segments, suppression et recalcul ; menu contextuel limité.
 - Colonnes/barres groupées, empilées et 100 %, courbes multi-séries ; jusqu'à huit séries avec cellules absentes.
 - Import d'une partie vérifiée de l'apparence des colonnes empilées : palette, ordre, polices, échelle, géométrie et étiquettes liées au modèle.
 - Rendu en groupes de formes et textes PowerPoint ordinaires ; les présentations restent visibles sans complément.
@@ -53,17 +54,19 @@ Chaque ligne contient `Libellé`, `Valeur`, `Secondaire` et `Total`. Les plages 
 | Mekko | Largeur positive ou nulle | Part bleue de 0 à 100 % | Ignoré |
 | Gantt | Début en jours relatifs | Durée strictement positive | Ignoré |
 
-Pour modifier, sélectionner le groupe entier et choisir **Modifier les données**. Les données sont sauvegardées avec le PPTX. Pour une liaison Excel, préciser fichier, feuille et plage ; **Importer Excel** lit les valeurs enregistrées. Les macros et mises à jour de liens externes sont désactivées pour cette ouverture de lecture. Un fichier absent ne supprime pas les données embarquées.
+Pour modifier, sélectionner le groupe ou une de ses formes et choisir **Modifier les données**. Les données sont sauvegardées avec le PPTX. Pour une liaison Excel, préciser fichier, feuille et plage ; **Importer Excel** lit les valeurs enregistrées. Les macros et mises à jour de liens externes sont désactivées pour cette ouverture de lecture. Un fichier absent ne supprime pas les données embarquées.
 
 **Multi-séries** ouvre un éditeur de matrice : première colonne = catégories, autres colonnes = séries. Le collage attend une première ligne d'en-têtes. Une cellule vide reste absente ; une courbe s'interrompt à cet endroit. Les empilements positifs et négatifs ont des bases séparées ; le mode 100 % accepte uniquement des valeurs positives ou nulles. Les liens Excel multi-séries ne sont pas encore disponibles : utiliser le collage ou **Importer JSON** avec le résultat du convertisseur ci-dessous.
 
 Le bouton **Cascade** utilise un éditeur dédié : catégories en colonnes, segments en lignes, cellules `e` recalculées. Les onglets Connecteurs et Ancrages modifient les liens et niveaux imposés. Le bouton **Recréer les liens** applique une disposition choisie ; les modifications numériques conservent les contraintes existantes. Voir [WATERFALL.md](WATERFALL.md) pour les quatre dispositions et limites. Les anciens graphiques de cascade restent éditables dans leur format initial. Un [exemple JSON synthétique](examples/WaterfallConstraints.json) peut être ouvert avec **Importer JSON**.
 
+Sélectionner une cascade à contraintes puis **Éditer les connecteurs** expose les poignées PowerPoint. Déplacer une extrémité vers un niveau de colonne ou un bord de segment ; le modèle est recalculé après relâchement et stabilisation. Le clic droit propose aussi les commandes de cascade. **Terminer les connecteurs** termine la session. Voir [INTERACTION.md](INTERACTION.md) pour les limites de synchronisation des sauvegardes automatisées.
+
 ![Cascade synthétique rendue par OpenCharts](examples/WaterfallConstraints.png)
 
 ## Limites importantes
 
-Cette version n'édite pas les objets propriétaires think-cell et ne reproduit pas ses menus contextuels ni son placement automatique. Le moteur ne gère pas encore les secteurs/anneaux, les graphiques combinés, les dates calendaires ou les ruptures d'axe. L'actualisation n'est pas automatique et ne lit pas les modifications Excel non enregistrées.
+Cette version n'édite pas les objets propriétaires think-cell. Son menu contextuel se limite aux cascades ; le menu radial complet et le placement automatique restent à réaliser. Le moteur ne gère pas encore les secteurs/anneaux, les graphiques combinés, les dates calendaires ou les ruptures d'axe. L'actualisation n'est pas automatique et ne lit pas les modifications Excel non enregistrées.
 
 La réédition régénère les formes ; les personnalisations manuelles et animations des formes internes ne sont pas conservées. Les groupes doivent être sans rotation pour être réédités. La disposition par défaut exige au moins 320 × 240 points ; une zone de tracé explicite importée permet des cadres plus petits, sous réserve que la géométrie finale reste dans le cadre. Changer le type ou le mode rétablit la disposition standard : agrandir d’abord les petits groupes à au moins 320 × 240 points. L’éditeur valide les dimensions avant de fermer. Un groupe dissocié perd sa fonction d’édition structurée.
 
@@ -73,9 +76,9 @@ La réédition régénère les formes ; les personnalisations manuelles et anima
 
 Les tests d'intégration distribués nécessitent Office installé et utilisent des documents synthétiques. Des comparaisons privées supplémentaires portent sur un profil de colonnes empilées, décrit dans [RECONSTRUCTION.md](RECONSTRUCTION.md). Elles ne démontrent ni parité visuelle globale ni parité des interactions.
 
-Résultats et limites détaillés dans [VALIDATION.md](VALIDATION.md) : **3 822 assertions moteur, 169 assertions du solveur de cascades, 23 assertions d’éditeur, 58 tests Python et 399 contrôles Office** avec le profil de référence optionnel. Sur ce profil empilé, les bords des neuf segments reconstruits diffèrent au plus d’un pixel à 1440 × 810. Ce résultat limité ne couvre pas toutes les étiquettes ni les interactions.
+Résultats et limites détaillés dans [VALIDATION.md](VALIDATION.md) : **3 822 assertions moteur, 169 assertions du solveur de cascades, 363 assertions d’interaction du modèle, 25 assertions d’éditeur, 55 contrôles du pont COM, 16 du minuteur, 58 tests Python, 29 contrôles d’interaction Office et 399 contrôles de la suite Office** avec le profil de référence optionnel. Sur ce profil empilé, les bords des neuf segments reconstruits diffèrent au plus d’un pixel à 1440 × 810. Ce résultat limité ne couvre pas toutes les étiquettes ni les interactions.
 
-Après installation, fermer PowerPoint puis lancer `Test-Office.ps1`. Le script démarre PowerPoint normalement avant de piloter les tests : un démarrage Office réservé à l'automatisation peut omettre les compléments utilisateur. Les tests Excel créent leur propre instance. Les callbacks interactifs et Undo/Redo restent à vérifier. L'option `-InputJson chemin.json` ajoute un test de rendu et de persistance d'un graphique converti ; son résultat reste local.
+Après installation, fermer PowerPoint puis lancer `Test-Office.ps1`. Le script démarre PowerPoint normalement avant de piloter les tests : un démarrage Office réservé à l'automatisation peut omettre les compléments utilisateur. Les tests Excel créent leur propre instance. `Test-Interactions.ps1` vérifie aussi les callbacks COM, le minuteur et l'édition des connecteurs natifs. Les parcours au clavier/souris, les menus et Undo/Redo restent à vérifier. L'option `-InputJson chemin.json` ajoute un test de rendu et de persistance d'un graphique converti ; son résultat reste local.
 
 ## Structure
 
@@ -87,6 +90,9 @@ Après installation, fermer PowerPoint puis lancer `Test-Office.ps1`. Le script 
 - `src/SeriesEditor.cs` : éditeur de matrice.
 - `src/WaterfallModel.cs`, `WaterfallSolver.cs`, `WaterfallChart.cs` : modèle, résolution exacte et rendu des cascades.
 - `src/WaterfallEditor.cs` : données, connecteurs et ancrages de cascade.
+- `src/WaterfallGeometry.cs` : géométrie commune, cibles physiques et mutations de connecteurs.
+- `src/WaterfallSlideEditor.cs` : édition des connecteurs natifs et menu contextuel.
+- `src/PowerPointEvents.cs`, `PowerPointTimer.cs` : événements COM et observation sur le thread Office.
 - `src/Connect.cs` : interfaces COM et ruban.
 - `tests/` : tests du moteur et intégration Office.
 
