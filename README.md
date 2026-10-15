@@ -5,7 +5,8 @@ Complément PowerPoint Windows open source, sous licence MIT. Le complément s'i
 ## État actuel
 
 - Ruban PowerPoint avec insertion et modification de graphiques.
-- Huit types de graphiques : cascade, colonnes, barres, courbe, Mekko à deux segments, Gantt en jours relatifs, secteurs et anneaux.
+- Dix types de graphiques : cascade, colonnes, barres, courbe, Mekko à deux segments, Gantt en jours relatifs, secteurs, anneaux, dispersion et bulles.
+- Dispersion/bulles : groupes, marqueurs, axes numériques linéaires/logarithmiques/inversés, tailles proportionnelles à l'aire ou au diamètre, partitions et régressions linéaires. Voir [SCATTER.md](SCATTER.md).
 - Secteurs/anneaux : rotation, quatre ordres, trou transparent, éclatements, couleurs et labels externes depuis un éditeur dédié. Voir [PIE.md](PIE.md).
 - Cascades multi-segments avec valeurs calculées `e`, connecteurs et ancrages modifiables ; calcul exact des contraintes.
 - Édition des connecteurs sur la diapositive : poignées d’interface, rattachement aux niveaux de colonnes/segments, suppression et recalcul ; création directe de liens et placement des bords de segments à zéro depuis le menu natif.
@@ -46,7 +47,7 @@ Le script retire uniquement les clés d'inscription OpenSlideCharts. Il conserve
 
 ## Données
 
-Chaque ligne contient `Libellé`, `Valeur`, `Secondaire` et `Total`. Les plages Excel ne doivent pas contenir d'en-tête ; deux à quatre colonnes, jusqu'à 40 lignes pour l'import Excel. Les graphiques acceptent jusqu'à 80 lignes, mais les étiquettes denses ne sont pas encore optimisées.
+Hors dispersion/bulles, l'import Excel attend deux à quatre colonnes (`Libellé`, `Valeur`, `Secondaire`, `Total`), sans en-tête, jusqu'à 40 lignes. Ces graphiques acceptent jusqu'à 80 lignes ; la disposition des étiquettes dépend du type et de la place disponible.
 
 | Type | Valeur | Secondaire | Total |
 |---|---|---|---|
@@ -55,6 +56,8 @@ Chaque ligne contient `Libellé`, `Valeur`, `Secondaire` et `Total`. Les plages 
 | Mekko | Largeur positive ou nulle | Part bleue de 0 à 100 % | Ignoré |
 | Gantt | Début en jours relatifs | Durée strictement positive | Ignoré |
 | Secteurs, anneaux | Valeur non négative ; au moins une positive | Doit rester nul | Doit rester faux |
+
+Dispersion/bulles utilisent un modèle de points distinct : `Libellé, X, Y, Taille, Groupe, Couleur, Marqueur`. Le lien Excel accepte trois à sept colonnes, jusqu'à 1 000 lignes. Ajouter/retirer les tailles convertit automatiquement le type ; voir [SCATTER.md](SCATTER.md) pour les cellules absentes, styles et limites.
 
 Pour modifier, sélectionner le groupe ou une de ses formes et choisir **Modifier les données**. Les données sont sauvegardées avec le PPTX. Pour une liaison Excel, préciser fichier, feuille et plage ; **Importer Excel** lit les valeurs enregistrées. Les macros et mises à jour de liens externes sont désactivées pour cette ouverture de lecture. Un fichier absent ne supprime pas les données embarquées.
 
@@ -80,7 +83,9 @@ La réédition régénère les formes ; les personnalisations manuelles et anima
 
 Les tests d'intégration distribués nécessitent Office installé et utilisent des documents synthétiques. Des comparaisons privées supplémentaires portent sur un profil de colonnes empilées, décrit dans [RECONSTRUCTION.md](RECONSTRUCTION.md). Elles ne démontrent ni parité visuelle globale ni parité des interactions.
 
-Résultats et limites détaillés dans [VALIDATION.md](VALIDATION.md). Le jalon secteurs/anneaux ajoute **740 contrôles de géométrie, 21 assertions d'éditeur et 1 684 assertions Office sur 12 fixtures**. La suite Office standard passe désormais 327 assertions, dont les cas Excel ajoutés. Les résultats antérieurs restent consignés séparément : 3 822 assertions moteur, 169 de solveur, 363 d'interaction du modèle, 66 de commandes, 25 d'éditeur, 55 du pont COM, 16 du minuteur, 58 tests Python, 53 d'interaction Office et 399 de la suite Office avec le profil de référence optionnel. Sur ce profil empilé, les bords des neuf segments reconstruits diffèrent au plus d'un pixel à 1440 × 810 ; cela ne couvre ni toutes les étiquettes ni les interactions.
+Résultats et limites détaillés dans [VALIDATION.md](VALIDATION.md). Le jalon dispersion/bulles ajoute **1 768 assertions de géométrie, 358 de régression sur 25 scénarios, 32 d'éditeur/données/stockage et 23 347 assertions Office sur 17 fixtures**. La suite Office standard passe désormais **331 assertions**, dont les conversions Excel dispersion/bulles. Un échec antérieur de comparaison des métadonnées n'a pas été reproduit ; sa cause reste inconnue et un diagnostic plus précis est conservé.
+
+Le jalon secteurs/anneaux conserve 740 contrôles de géométrie, 21 assertions d'éditeur et 1 684 assertions Office sur 12 fixtures. Les résultats antérieurs restent consignés séparément : 3 822 assertions moteur, 169 de solveur, 363 d'interaction du modèle, 66 de commandes, 25 d'éditeur, 55 du pont COM, 16 du minuteur, 58 tests Python, 53 d'interaction Office et 399 de la suite Office avec le profil de référence optionnel. Sur ce profil empilé, les bords des neuf segments reconstruits diffèrent au plus d'un pixel à 1440 × 810 ; cela ne couvre ni toutes les étiquettes ni les interactions.
 
 Après installation, fermer PowerPoint puis lancer `Test-Office.ps1`. Le script démarre PowerPoint normalement avant de piloter les tests : un démarrage Office réservé à l'automatisation peut omettre les compléments utilisateur. Les tests Excel créent leur propre instance. `Test-Interactions.ps1` vérifie aussi les callbacks COM, le minuteur et l'édition des connecteurs natifs. Trois parcours souris ciblés couvrent les menus natifs, le rattachement, l'ajout avec choix de réparation, l'ancrage à zéro et Échap imbriqué ; voir [UI-VALIDATION.md](UI-VALIDATION.md). La couverture exhaustive des gestes et Undo/Redo reste à réaliser. L'option `-InputJson chemin.json` ajoute un test de rendu et de persistance d'un graphique converti ; son résultat reste local.
 
@@ -89,6 +94,8 @@ Après installation, fermer PowerPoint puis lancer `Test-Office.ps1`. Le script 
 - `src/ChartCore.cs` : modèle et calcul géométrique indépendant d'Office.
 - `src/SeriesChart.cs` : géométrie multi-séries.
 - `src/PieChart.cs`, `src/PieEditor.cs` : géométrie et édition des secteurs/anneaux.
+- `src/ScatterChart.cs`, `src/ScatterEditor.cs`, `src/ScatterData.cs` : dispersion/bulles, données et édition.
+- `src/ScatterRegression.cs` : régression normalisée avec calcul exact interne.
 - `src/ChartAppearance.cs` : propriétés d'apparence importée et validation.
 - `src/OfficeAdapter.cs` : formes PowerPoint, persistance et lecture Excel.
 - `src/ChartEditor.cs` : éditeur WinForms.

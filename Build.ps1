@@ -10,7 +10,7 @@ $sources = @(Get-ChildItem -LiteralPath (Join-Path $root 'src') -Filter '*.cs' |
 & $compiler /nologo /target:library /platform:anycpu /optimize+ '/r:System.Windows.Forms.dll' '/r:System.Drawing.dll' '/r:System.Web.Extensions.dll' '/r:Microsoft.CSharp.dll' '/r:System.Numerics.dll' ("/out:" + (Join-Path $bin 'OpenSlideCharts.dll')) $sources
 if ($LASTEXITCODE -ne 0) { throw 'Add-in build failed.' }
 if ($Test) {
-    $coreSources = @('src\ChartCore.cs', 'src\ChartAppearance.cs', 'src\SeriesChart.cs', 'src\PieChart.cs', 'src\WaterfallModel.cs', 'src\WaterfallSolver.cs', 'src\WaterfallGeometry.cs', 'src\WaterfallChart.cs', 'tests\CoreTests.cs') | ForEach-Object { Join-Path $root $_ }
+    $coreSources = @('src\ChartCore.cs', 'src\ChartAppearance.cs', 'src\SeriesChart.cs', 'src\PieChart.cs', 'src\ScatterChart.cs', 'src\ScatterRegression.cs', 'src\WaterfallModel.cs', 'src\WaterfallSolver.cs', 'src\WaterfallGeometry.cs', 'src\WaterfallChart.cs', 'tests\CoreTests.cs') | ForEach-Object { Join-Path $root $_ }
     & $compiler /nologo /target:exe '/r:System.Numerics.dll' ("/out:" + (Join-Path $bin 'CoreTests.exe')) $coreSources
     if ($LASTEXITCODE -ne 0) { throw 'Test build failed.' }
     & (Join-Path $bin 'CoreTests.exe')
@@ -19,6 +19,14 @@ if ($Test) {
     if ($LASTEXITCODE -ne 0) { throw 'Pie test build failed.' }
     & (Join-Path $bin 'PieTests.exe')
     if ($LASTEXITCODE -ne 0) { throw 'Pie tests failed.' }
+    & $compiler /nologo /target:exe '/r:System.Numerics.dll' ('/r:' + (Join-Path $bin 'OpenSlideCharts.dll')) ('/out:' + (Join-Path $bin 'ScatterTests.exe')) (Join-Path $root 'tests\ScatterTests.cs')
+    if ($LASTEXITCODE -ne 0) { throw 'Scatter test build failed.' }
+    & (Join-Path $bin 'ScatterTests.exe')
+    if ($LASTEXITCODE -ne 0) { throw 'Scatter tests failed.' }
+    & $compiler /nologo /target:exe '/r:System.Numerics.dll' ('/r:' + (Join-Path $bin 'OpenSlideCharts.dll')) ('/out:' + (Join-Path $bin 'ScatterRegressionTests.exe')) (Join-Path $root 'tests\ScatterRegressionTests.cs')
+    if ($LASTEXITCODE -ne 0) { throw 'Scatter regression test build failed.' }
+    & (Join-Path $bin 'ScatterRegressionTests.exe')
+    if ($LASTEXITCODE -ne 0) { throw 'Scatter regression tests failed.' }
     & $compiler /nologo /target:exe '/r:System.Numerics.dll' ('/r:' + (Join-Path $bin 'OpenSlideCharts.dll')) ('/out:' + (Join-Path $bin 'WaterfallTests.exe')) (Join-Path $root 'tests\WaterfallTests.cs')
     if ($LASTEXITCODE -ne 0) { throw 'Waterfall test build failed.' }
     & (Join-Path $bin 'WaterfallTests.exe')
@@ -59,5 +67,9 @@ if ($Test) {
     if ($LASTEXITCODE -ne 0) { throw 'Pie editor test build failed.' }
     & (Join-Path $bin 'PieEditorTests.exe')
     if ($LASTEXITCODE -ne 0) { throw 'Pie editor tests failed.' }
+    & $compiler /nologo /target:exe '/r:System.Windows.Forms.dll' ('/r:' + (Join-Path $bin 'OpenSlideCharts.dll')) ('/out:' + (Join-Path $bin 'ScatterEditorTests.exe')) (Join-Path $root 'tests\ScatterEditorTests.cs')
+    if ($LASTEXITCODE -ne 0) { throw 'Scatter editor test build failed.' }
+    & (Join-Path $bin 'ScatterEditorTests.exe')
+    if ($LASTEXITCODE -ne 0) { throw 'Scatter editor tests failed.' }
 }
 Write-Output ('Built: ' + (Join-Path $bin 'OpenSlideCharts.dll'))

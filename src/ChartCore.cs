@@ -14,6 +14,7 @@ namespace OpenSlideCharts
         public ChartAppearance Appearance;
         public WaterfallSpec Waterfall;
         public PieOptions Pie;
+        public ScatterSpec Scatter;
         public List<string> ImportWarnings = new List<string>();
     }
     public sealed class ChartRow
@@ -75,7 +76,8 @@ namespace OpenSlideCharts
             Layout result = new Layout();
             if (spec.Appearance == null || spec.Appearance.ShowTitle)
                 Text(result, spec.Title ?? spec.Kind, 14, 8, width - 28, 28, 20, Ink, "left");
-            if (kind == "pie" || kind == "doughnut") BuildPie(result, spec, width, height);
+            if (kind == "scatter" || kind == "bubble") BuildScatter(result, spec, width, height);
+            else if (kind == "pie" || kind == "doughnut") BuildPie(result, spec, width, height);
             else if (spec.Waterfall != null) ConstraintWaterfall(result, spec, width, height);
             else if (spec.Series != null && spec.Series.Count > 0) MultiSeries(result, spec, width, height);
             else if (kind == "mekko") Mekko(result, spec, width, height);
@@ -100,8 +102,10 @@ namespace OpenSlideCharts
             if (!Finite(width) || !Finite(height) || width < (observedPlot ? 1 : 320) || height < (observedPlot ? 1 : 240) || width > 100000 || height > 100000)
                 throw new ArgumentOutOfRangeException("width", "Chart dimensions must be finite, from 320 x 240 to 100000 x 100000 points.");
             string kind = (spec.Kind ?? "").ToLowerInvariant();
-            if (kind != "waterfall" && kind != "column" && kind != "bar" && kind != "line" && kind != "mekko" && kind != "gantt" && kind != "pie" && kind != "doughnut")
-                throw new NotSupportedException("Unsupported chart kind: " + spec.Kind + ". Supported: Waterfall, Column, Bar, Line, Mekko, Gantt, Pie, Doughnut.");
+            if (kind != "waterfall" && kind != "column" && kind != "bar" && kind != "line" && kind != "mekko" && kind != "gantt" && kind != "pie" && kind != "doughnut" && kind != "scatter" && kind != "bubble")
+                throw new NotSupportedException("Unsupported chart kind: " + spec.Kind + ". Supported: Waterfall, Column, Bar, Line, Mekko, Gantt, Pie, Doughnut, Scatter, Bubble.");
+            if (kind == "scatter" || kind == "bubble") { ValidateScatter(spec); return; }
+            if (spec.Scatter != null) throw new NotSupportedException("Scatter data requires Kind=Scatter or Bubble.");
             if (kind == "pie" || kind == "doughnut")
             {
                 ValidatePie(spec);
@@ -279,7 +283,14 @@ namespace OpenSlideCharts
         {
             ChartSpec spec = new ChartSpec { Kind = kind, Title = "OpenSlideCharts - " + kind };
             string key = (kind ?? "").ToLowerInvariant();
-            if (key == "waterfall")
+            if (key == "scatter" || key == "bubble")
+            {
+                spec.Scatter = new ScatterSpec { XTitle = "Investment", YTitle = "Return" };
+                spec.Scatter.Points.Add(new ScatterPoint { Label = "North", Group = "Core", X = 10, Y = 15, Size = key == "bubble" ? (double?)20 : null });
+                spec.Scatter.Points.Add(new ScatterPoint { Label = "South", Group = "Core", X = 20, Y = 32, Size = key == "bubble" ? (double?)45 : null });
+                spec.Scatter.Points.Add(new ScatterPoint { Label = "West", Group = "Growth", X = 30, Y = 25, Size = key == "bubble" ? (double?)30 : null });
+            }
+            else if (key == "waterfall")
             {
                 Add(spec, "Opening", 100, 0, true); Add(spec, "Sales", 65, 0, false);
                 Add(spec, "Costs", -80, 0, false); Add(spec, "Closing", 85, 0, true);

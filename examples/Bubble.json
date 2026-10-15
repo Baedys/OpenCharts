@@ -1,0 +1,18 @@
+{
+  "Kind": "Bubble",
+  "Title": "Bulles synthétiques",
+  "Scatter": {
+    "XTitle": "Potentiel",
+    "YTitle": "Performance",
+    "BubbleSizing": "Area",
+    "MaxBubbleDiameter": 60,
+    "Points": [
+      { "Label": "Alpha", "X": 18, "Y": 12, "Size": 16, "Group": "Produits" },
+      { "Label": "Beta", "X": 42, "Y": 31, "Size": 36, "Group": "Produits" },
+      { "Label": "Gamma", "X": 29, "Y": 35, "Size": 25, "Group": "Services" },
+      { "Label": "Delta", "X": 55, "Y": 24, "Size": 9, "Group": "Services" },
+      { "Label": "Référence de taille", "Size": 100 }
+    ],
+    "Partitions": [ { "X1": 0, "Y1": 25, "X2": 60, "Y2": 25, "Label": "Objectif" } ]
+  }
+}

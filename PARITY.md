@@ -15,10 +15,10 @@ Statuts : **prototype** = réalisation partielle testable ; **absent** = non ré
 | Colonnes et barres | Prototype | Groupées, empilées, 100 % et séries multiples réalisées ; un profil empilé comparé localement, généralisation et interactions restantes |
 | Courbes et aires | Prototype / absent | Courbes multi-séries avec interruption aux données absentes ; dates, aires et combinaisons restantes |
 | Secteurs et anneaux | Prototype | Rotation, quatre ordres, trous transparents, explosions et labels externes réalisés ; gestes sur diapositive, labels intérieurs et comparaison de référence restants. Voir PIE.md |
-| Dispersion et bulles | Absent | Axes numériques, surface des bulles, quadrants, régressions |
+| Dispersion et bulles | Prototype | Axes numériques linéaires/log/inversés, groupes, tailles en aire/diamètre, deux labels, partitions et régressions linéaires réalisés ; gestes, légende de tailles, modèles non linéaires et comparaison de référence restants. Voir SCATTER.md |
 | Mekko | Prototype | Nombre arbitraire de segments et axes unitaires |
 | Gantt | Prototype | Calendrier, semaines ISO, jours non ouvrés, jalons, dépendances |
-| Placement d'étiquettes | Prototype limité | Géométrie liée, écarts uniformes et décalages de valeurs importés pour un profil empilé ; optimisation anticollision et leaders absents |
+| Placement d'étiquettes | Prototype limité | Géométrie liée et décalages importés pour un profil empilé ; placements et traits de rappel originaux pour secteurs/dispersion ; optimisation générale et parité restantes |
 | Axes et graduations | Prototype | Bornes persistées importables dans le profil vérifié ; ruptures, échelles communes et secondaires restantes |
 | Annotations | Absent | Écarts, taux de croissance, CAGR, accolades et lignes de valeur |
 | Couleurs et styles | Prototype limité | Couleurs de thème résolues, polices et formats simples importés ; gras/italique et styles non uniformes refusés pour l'apparence |

@@ -1,5 +1,11 @@
 # Journal de reconstruction
 
+## Dispersion et bulles
+
+Le manuel public, les descriptions des axes et les KB de conversion/échelle ont servi à définir points, groupes, contenus d'étiquettes, représentation de tailles, partitions et régressions. La projection linéaire est centrée avant normalisation. Les moments et intersections des tendances utilisent des rationnels exacts avant leur conversion en coordonnées de formes ; cette architecture et l'heuristique de labels sont originales. La pondération par Taille brute reste un choix explicite, distinct de l'expression moins précise « taille des bulles » du manuel.
+
+Une lecture native ciblée a réutilisé l'identité SHA et les preuves privées existantes. Cinq groupes de chaînes ont été consignés avec plages PE et hashes : états de dispersion/groupes, tailles de bulles, tendance/régression, partition et labels/axes. Ces noms ne prouvent ni algorithmes ni sémantique d'exécution ; des littéraux OOXML ne suffisent notamment pas à établir une politique de tailles négatives. Le cache de fonctions REA ne contenait pas de réponse spécifique ; aucune nouvelle analyse Ghidra n'a été lancée. Aucun exécutable propriétaire n'a été exécuté. Sources, limites et choix originaux figurent dans [SCATTER.md](SCATTER.md).
+
 ## Secteurs et anneaux
 
 Le [manuel public dédié](https://www.thinkcell.com/en/resources/manual/pie) a servi de source pour les capacités de rotation, ordre, trou, explosion et contenu des labels. Le moteur, les contours de Bézier, la disposition externe et l'éditeur sont du code original. Le départ à -90°, le trou de 50 % des anneaux et le refus des négatifs sont des choix de reconstruction ; les réglages par défaut de la référence restent inconnus.

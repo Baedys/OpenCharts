@@ -2,6 +2,19 @@
 
 Tests locaux réalisés les 15–16 octobre 2026, sous Windows avec PowerPoint/Excel de bureau x64, version Office 16.0.20430.20146.
 
+## Jalon dispersion et bulles
+
+- **1 768 assertions de géométrie** : marqueurs, groupes, axes linéaires/logarithmiques/inversés, tailles en aire/diamètre, données absentes, étiquettes et partitions. Le placement et les graduations sont des choix originaux, sans comparaison de référence.
+- **25 scénarios, 358 assertions de régression** : moindres carrés ordinaires et pondérés, R², valeurs extrêmes, coordonnées adjacentes autour de `1e16`, axes fixes/inversés et intersection exacte de la droite avec le cadre. La revue a révélé puis fait corriger une perte de précision qui décalait la droite malgré un R² égal à 1.
+- **32 assertions d'éditeur, données et stockage** : remplacement transactionnel, valeurs absentes, styles et groupes avec espaces significatifs, conservation des réglages, conversion dispersion/bulles et plafond de métadonnées.
+- **23 347 assertions Office, 17 fixtures synthétiques**, processus terminé avec code 0 : géométrie des formes et textes natifs, couleurs, droite passant par des coordonnées extrêmes, partitions, bulles de très petit diamètre, remplacement avec rollback, tags, sauvegarde/réouverture et absence d'objet OLE ou graphique incorporé. Le cas de 1 000 points conserve 99 351 caractères JSON dans 1 104 tags, au-delà de l'ancien plafond. Les nouveaux rendus ont aussi été inspectés visuellement.
+- **331 assertions de la suite Office standard**, processus terminé avec code 0 : régressions des graphiques précédents et nouvelles lectures Excel dispersion/bulles. La colonne Taille convertit le type, une ligne de taille sans coordonnées reste disponible pour l'échelle et les styles absents des colonnes restent conservés à nombre de lignes identique. Le classeur est synthétique, ouvert dans une instance séparée.
+- **Parcours interactif à 200 %** : réédition depuis le ruban, contrôle du titre/grille/axes/marqueurs, choix aire → diamètre puis Appliquer, Ctrl+Z et Ctrl+Y. Le modèle et les trois diamètres natifs concordent après chaque transition. Le champ de titre rogné observé au premier passage a été corrigé. Voir [UI-VALIDATION.md](UI-VALIDATION.md) pour le périmètre limité.
+
+Un passage antérieur a échoué sur une comparaison de métadonnées sans identifier la fixture. La comparaison ciblée des 1 000 points, puis la suite complète avec diagnostic de première différence ont réussi sans changement de production entre ces passages. La cause de cet échec reste inconnue ; il n'est pas présenté comme un défaut corrigé. Le diagnostic enrichi est conservé pour une éventuelle récidive.
+
+`Build.ps1 -Test` conserve également les 3 822 assertions moteur, 740 secteurs/anneaux et les suites antérieures. Voir [SCATTER.md](SCATTER.md) et `Test-Scatter.ps1`. Ces tests vérifient notre implémentation originale ; **ils ne prouvent aucune parité avec think-cell**.
+
 ## Jalon secteurs et anneaux
 
 - **740 contrôles de géométrie** : contours fermés, sens du trou, aires/proportions, tri stable, couleurs, extrêmes numériques, petits segments, labels denses et glyphes larges. Ces contrôles portent sur notre moteur original.

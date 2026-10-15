@@ -10,17 +10,20 @@ namespace OpenSlideCharts
 {
     public static class ChartStorage
     {
+        private const int MaximumEncodedCharacters = 2 * 1024 * 1024;
+        private const int TagCharacters = 180;
+        private const int MaximumTags = (MaximumEncodedCharacters + TagCharacters - 1) / TagCharacters;
         public static string Serialize(ChartSpec spec) { return new JavaScriptSerializer().Serialize(spec); }
         public static ChartSpec Clone(ChartSpec spec) { return new JavaScriptSerializer().Deserialize<ChartSpec>(Serialize(spec)); }
         public static void Write(object shapeObject, ChartSpec spec)
         {
             dynamic shape = shapeObject;
             string hex = BitConverter.ToString(Encoding.UTF8.GetBytes(Serialize(spec))).Replace("-", "");
-            if (hex.Length > 160000) throw new ArgumentException("Données trop volumineuses pour ce prototype.");
-            int count = (hex.Length + 179) / 180;
+            if (hex.Length > MaximumEncodedCharacters) throw new ArgumentException("Données trop volumineuses : 1 Mio de JSON UTF-8 au maximum.");
+            int count = (hex.Length + TagCharacters - 1) / TagCharacters;
             shape.Tags.Add("OSC_VERSION", "1");
             shape.Tags.Add("OSC_COUNT", count.ToString(CultureInfo.InvariantCulture));
-            for (int i = 0; i < count; i++) shape.Tags.Add("OSC_DATA_" + i.ToString("D4"), hex.Substring(i * 180, Math.Min(180, hex.Length - i * 180)));
+            for (int i = 0; i < count; i++) shape.Tags.Add("OSC_DATA_" + i.ToString("D4"), hex.Substring(i * TagCharacters, Math.Min(TagCharacters, hex.Length - i * TagCharacters)));
             shape.AlternativeText = "OpenSlideCharts : " + spec.Title + ". Graphique " + spec.Kind + ".";
         }
         public static ChartSpec Read(object shapeObject)
@@ -29,15 +32,16 @@ namespace OpenSlideCharts
             string version = shape.Tags.Item("OSC_VERSION");
             if (version != "1") throw new ArgumentException("Sélectionnez un groupe OpenSlideCharts (version 1).");
             int count;
-            if (!int.TryParse((string)shape.Tags.Item("OSC_COUNT"), out count) || count < 1 || count > 889) throw new InvalidDataException("Métadonnées du graphique invalides.");
+            if (!int.TryParse((string)shape.Tags.Item("OSC_COUNT"), out count) || count < 1 || count > MaximumTags) throw new InvalidDataException("Métadonnées du graphique invalides.");
             StringBuilder encoded = new StringBuilder();
             for (int i = 0; i < count; i++)
             {
                 string part = shape.Tags.Item("OSC_DATA_" + i.ToString("D4"));
-                if (part.Length == 0 || part.Length > 180) throw new InvalidDataException("Données du graphique incomplètes.");
+                if (part.Length == 0 || part.Length > TagCharacters) throw new InvalidDataException("Données du graphique incomplètes.");
                 encoded.Append(part);
             }
             string hex = encoded.ToString();
+            if (hex.Length > MaximumEncodedCharacters) throw new InvalidDataException("Données du graphique trop volumineuses.");
             if (hex.Length % 2 != 0) throw new InvalidDataException("Encodage du graphique invalide.");
             byte[] bytes = new byte[hex.Length / 2];
             for (int i = 0; i < bytes.Length; i++) bytes[i] = Convert.ToByte(hex.Substring(i * 2, 2), 16);
@@ -113,7 +117,8 @@ namespace OpenSlideCharts
                     }
                     else if (p.Kind == "rect" || p.Kind == "ellipse")
                     {
-                        s = slide.Shapes.AddShape(p.Kind == "ellipse" ? 9 : 1, (float)(left + p.X), (float)(top + p.Y), (float)Math.Max(.05, p.W), (float)Math.Max(.05, p.H));
+                        bool exactSize = p.Role == "SCATTER_POINT";
+                        s = slide.Shapes.AddShape(p.Kind == "ellipse" ? 9 : 1, (float)(left + p.X), (float)(top + p.Y), (float)(exactSize ? p.W : Math.Max(.05, p.W)), (float)(exactSize ? p.H : Math.Max(.05, p.H)));
                         s.Fill.Solid(); s.Fill.ForeColor.RGB = p.Color; s.Line.Visible = 0;
                     }
                     else throw new NotSupportedException("Primitive inconnue : " + p.Kind);
@@ -210,6 +215,12 @@ namespace OpenSlideCharts
                 sheets = book.Worksheets; sheet = sheets.Item(source.Worksheet); range = sheet.Range[source.RangeAddress];
                 rows = range.Rows; columns = range.Columns; areas = range.Areas;
                 int rowCount = rows.Count, colCount = columns.Count;
+                if (String.Equals(source.Kind, "Scatter", StringComparison.OrdinalIgnoreCase) || String.Equals(source.Kind, "Bubble", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (rowCount < 1 || rowCount > 1000 || colCount < 3 || colCount > 7 || (int)areas.Count != 1)
+                        throw new ArgumentException("Dispersion/bulles : plage contiguë de 1 à 1000 lignes et 3 à 7 colonnes, sans en-tête.");
+                    return ScatterData.ReadCells(source, range.Value2 as object[,]);
+                }
                 if (rowCount < 1 || rowCount > 40 || colCount < 2 || colCount > 4 || (int)areas.Count != 1) throw new ArgumentException("Plage contiguë attendue : 1 à 40 lignes, 2 à 4 colonnes, sans en-tête.");
                 object[,] cells = range.Value2 as object[,];
                 if (cells == null) throw new ArgumentException("La plage doit contenir libellé et valeur.");

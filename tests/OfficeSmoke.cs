@@ -75,6 +75,8 @@ public static class OfficeSmoke
             object[,] tallData = new object[40, 2];
             for (int i = 0; i < 40; i++) { tallData[i, 0] = "C" + i; tallData[i, 1] = i == 0 ? 1000 : .1; }
             cells.Value2 = tallData;
+            Marshal.FinalReleaseComObject((object)cells); cells = sheet.Range["L1:R4"];
+            cells.Value2 = new object[,] { { "A", 1, 2, 4, "North", "#123456", "Circle" }, { "B", 3, 5, 1, "North", null, null }, { "Scale", null, null, 100, null, null, null }, { "Missing", 4, null, 1, "South", null, null } };
             workbook.SaveAs(xlsx, 51);
             Marshal.FinalReleaseComObject((object)cells); cells = null;
             Marshal.FinalReleaseComObject((object)sheet); sheet = null;
@@ -99,6 +101,15 @@ public static class OfficeSmoke
             pieLink.RangeAddress = "I1:J40"; pieLink.Pie.Slices.Clear();
             ChartSpec tallPie = ExcelLink.Read(pieLink);
             Check(tallPie.Rows.Count == 40 && ChartEngine.Build(tallPie, 720, 1000).Items.Count > 40, "Excel must validate pie data independently of a fixed 720 by 400 layout.");
+            ChartSpec scatterLink = ChartSamples.Create("Scatter"); scatterLink.WorkbookPath = xlsx; scatterLink.Worksheet = "Donnees"; scatterLink.RangeAddress = "L1:R4";
+            string scatterBefore = ChartStorage.Serialize(scatterLink);
+            ChartSpec bubbles = ExcelLink.Read(scatterLink);
+            Check(bubbles.Kind == "Bubble" && bubbles.Scatter.Points.Count == 4 && bubbles.Scatter.Points[2].Size == 100 && !bubbles.Scatter.Points[2].X.HasValue, "Excel Size column must create bubbles and retain size-only reference rows.");
+            Check(bubbles.Scatter.Points[0].Color == "#123456" && bubbles.Rows.Count == 0 && ChartStorage.Serialize(scatterLink) == scatterBefore, "Scatter Excel parsing must preserve styles without mutating its source.");
+            bubbles.RangeAddress = "L1:N4";
+            ChartSpec scatterAgain = ExcelLink.Read(bubbles);
+            Check(scatterAgain.Kind == "Scatter" && scatterAgain.Scatter.Points.Count == 4 && !scatterAgain.Scatter.Points[0].Size.HasValue, "Removing Excel Size values must return to Scatter.");
+            Check(scatterAgain.Scatter.Points[0].Color == "#123456" && scatterAgain.Scatter.Points[0].Marker == "Circle", "Same-count refresh must preserve point styles absent from the source columns.");
             dynamic linkedSlide = deck.Slides.Add(7, 12);
             dynamic old = OfficeRenderer.Render((object)linkedSlide, linked, 30, 45, 900, 450);
             linked.Rows[1].Value = 50; linked.Rows[3].Value = 125;

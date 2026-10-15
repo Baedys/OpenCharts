@@ -2,6 +2,16 @@
 
 Vérifications effectuées le 15 octobre 2026 sur PowerPoint Windows x64 16.0.20430.20146. Les graphiques sont synthétiques, créés par OpenCharts. Les gestes utilisent le contrôle Windows Computer Use ; les valeurs et contraintes sont ensuite relues par le modèle objet PowerPoint. Ces parcours ne sont pas une comparaison d'exécution avec think-cell. Les fichiers JSON fournis reprennent les données et contraintes des trois fixtures utilisées ; leur import par dialogue n'a pas été exercé pendant ces gestes.
 
+## Dispersion et bulles — 16 octobre 2026
+
+Sur le profil Office x64 local à 200 %, **Modifier les données** du ruban a rouvert un groupe de trois bulles synthétiques. Le premier parcours a révélé le champ de titre rogné ; deux hauteurs de lignes explicites corrigent son affichage. Le passage final a vérifié visuellement le titre, les sept en-têtes de données, les deux panneaux d'axes et les options de marqueurs, tailles, grille et légende.
+
+Dans l'onglet **Marqueurs**, le choix **Aire proportionnelle** est passé à **Diamètre proportionnel**, puis **Appliquer** a régénéré le groupe. Les tailles de données sont 20, 45 et 30 ; avec un maximum de 50 points, les diamètres natifs relus valent environ 22,2222, 50 et 33,3333 points. Le modèle enregistre `BubbleSizing="Diameter"`.
+
+Un Ctrl+Z a restauré `Area` et les diamètres 33,3333, 50 et 40,8248 points ; un Ctrl+Y a rétabli `Diameter` et ses trois diamètres. Les deux transitions sont réalisées par entrées clavier Windows réelles. La relecture COM compare les trois formes au modèle, avec une tolérance de 0,02 point. La présentation synthétique a été sauvegardée/exportée puis fermée.
+
+Ce parcours ciblé ne valide pas les autres onglets, le collage interactif, la conversion de type par saisie, les poignées directes ni tous les historiques Undo/Redo. Les 17 fixtures et 23 347 assertions de `tests/ScatterOffice.cs` couvrent séparément le rendu, les tags, la sauvegarde/réouverture et le rollback, sans entrées souris. Aucune comparaison d'exécution avec think-cell n'est revendiquée.
+
 ## Secteurs et anneaux — 16 octobre 2026
 
 Sur le profil Office x64 local à 200 %, le bouton **Modifier les données** du ruban a ouvert l'éditeur d'un anneau synthétique. L'inspection a fait corriger une mise à l'échelle trop tôt dans la construction WinForms, des en-têtes de grille rognés et un contrôle de décimales invisible. Le formulaire final expose les données et tous les champs de réglages sans rognage dans ce parcours.

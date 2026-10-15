@@ -82,6 +82,8 @@ namespace OpenSlideCharts
                 <button id='oscGantt' label='Gantt' size='large' tag='Gantt' onAction='InsertChart'/>
                 <button id='oscPie' label='Secteurs' tag='Pie' onAction='InsertChart'/>
                 <button id='oscDoughnut' label='Anneau' tag='Doughnut' onAction='InsertChart'/>
+                <button id='oscScatter' label='Dispersion' tag='Scatter' onAction='InsertChart'/>
+                <button id='oscBubble' label='Bulles' tag='Bubble' onAction='InsertChart'/>
                 <button id='oscSeries' label='Multi-séries' onAction='InsertSeries'/>
               </group>
               <group id='oscData' label='Données et liens Excel'>
@@ -199,6 +201,7 @@ namespace OpenSlideCharts
                 string kind = (string)((dynamic)control).Tag;
                 if (kind == "Waterfall") { InsertSpec(WaterfallProfiles.Sample()); return; }
                 if (kind == "Pie" || kind == "Doughnut") { InsertSpec(ChartSamples.Create(kind)); return; }
+                if (kind == "Scatter" || kind == "Bubble") { InsertSpec(ChartSamples.Create(kind)); return; }
                 using (ChartEditor editor = new ChartEditor(ChartSamples.Create(kind)))
                 {
                     if (editor.ShowDialog() != DialogResult.OK) return;
@@ -240,6 +243,10 @@ namespace OpenSlideCharts
         public void EndConnectorEditing(object control) { Run(delegate { if (slideEditor != null) slideEditor.Stop(true, true); InvalidateRibbon(); }); }
         private static ChartSpec EditSpec(ChartSpec source, double? width = null, double? height = null)
         {
+            if (String.Equals(source.Kind, "Scatter", StringComparison.OrdinalIgnoreCase) || String.Equals(source.Kind, "Bubble", StringComparison.OrdinalIgnoreCase))
+            {
+                using (var editor = new ScatterEditor(source, width ?? 720, height ?? 400)) return editor.ShowDialog() == DialogResult.OK ? editor.Spec : null;
+            }
             if (String.Equals(source.Kind, "Pie", StringComparison.OrdinalIgnoreCase) || String.Equals(source.Kind, "Doughnut", StringComparison.OrdinalIgnoreCase))
             {
                 using (var editor = new PieEditor(source, width ?? 720, height ?? 400)) return editor.ShowDialog() == DialogResult.OK ? editor.Spec : null;
@@ -337,7 +344,7 @@ namespace OpenSlideCharts
         }
         public void About(object control)
         {
-            MessageBox.Show("OpenSlideCharts 0.1 — sources sous licence MIT.\n\nPrototype indépendant, non affilié à think-cell.\n8 types de graphiques en formes PowerPoint éditables.\nColonnes, barres et courbes : jusqu'à 8 séries.\nSecteurs/anneaux : rotation, ordre, trou et éclatement depuis l'éditeur.\nExcel : lecture des données enregistrées, actualisation manuelle.\n\nLimites : Mekko à 2 segments ; Gantt en jours relatifs ; placement automatique général et édition des objets think-cell absents.\nLa réédition régénère les formes : personnalisations manuelles et animations ne sont pas conservées.\nLa parité think-cell reste à réaliser.", "OpenSlideCharts", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            MessageBox.Show("OpenSlideCharts 0.1 — sources sous licence MIT.\n\nPrototype indépendant, non affilié à think-cell.\n10 types de graphiques en formes PowerPoint éditables.\nColonnes, barres et courbes : jusqu'à 8 séries.\nSecteurs/anneaux : rotation, ordre, trou et éclatement depuis l'éditeur.\nDispersion/bulles : axes, groupes, tailles, partitions et tendances linéaires.\nExcel : lecture des données enregistrées, actualisation manuelle.\n\nLimites : Mekko à 2 segments ; Gantt en jours relatifs ; placement automatique général et édition des objets think-cell absents.\nLa réédition régénère les formes : personnalisations manuelles et animations ne sont pas conservées.\nLa parité think-cell reste à réaliser.", "OpenSlideCharts", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         private object ActiveSlide()
         {

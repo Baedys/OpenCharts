@@ -1,0 +1,18 @@
+{
+  "Kind": "Scatter",
+  "Title": "Dispersion synthétique",
+  "Scatter": {
+    "XTitle": "Volume",
+    "YTitle": "Résultat",
+    "MarkerScheme": "Shapes",
+    "SecondLabelContent": "XY",
+    "Points": [
+      { "Label": "Nord", "X": 12, "Y": 18, "Group": "A" },
+      { "Label": "Sud", "X": 26, "Y": 31, "Group": "A" },
+      { "Label": "Ouest", "X": 18, "Y": 24, "Group": "B" },
+      { "Label": "Est", "X": 32, "Y": 28, "Group": "B" }
+    ],
+    "Trendlines": [ { "Group": null, "ShowRSquared": true, "ShowEquation": true } ],
+    "Partitions": [ { "X1": 22, "Y1": 0, "X2": 22, "Y2": 40, "Label": "Seuil" } ]
+  }
+}
