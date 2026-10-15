@@ -1,5 +1,13 @@
 # Journal de reconstruction
 
+## Secteurs et anneaux
+
+Le [manuel public dédié](https://www.thinkcell.com/en/resources/manual/pie) a servi de source pour les capacités de rotation, ordre, trou, explosion et contenu des labels. Le moteur, les contours de Bézier, la disposition externe et l'éditeur sont du code original. Le départ à -90°, le trou de 50 % des anneaux et le refus des négatifs sont des choix de reconstruction ; les réglages par défaut de la référence restent inconnus.
+
+Une investigation native bornée a réutilisé l'identité de la DLL et le snapshot REA existants, puis effectué des lectures PE/chaînes statiques ciblées. Les noms repérés sont compatibles avec des états de rotation, ordre, trou, explosion, labels et sérialisation de secteurs/anneaux. Ces observations sont des pistes, sans preuve d'algorithme, de valeur par défaut ni d'exécution. Le cache de fonctions existant portait sur COM et les cascades ; aucune nouvelle décompilation ciblée Pie n'a été obtenue lors de ce passage. Les lectures brutes, leurs offsets, hashes et limites restent privées. Le dossier de ressources REA existant établit la provenance de la cible, pas ces comportements.
+
+La session REA a été fermée, la DLL de référence est restée inchangée. Aucun exécutable propriétaire n'a été lancé. Les tests et rendus distribuables utilisent uniquement des données synthétiques ; voir [PIE.md](PIE.md) et [VALIDATION.md](VALIDATION.md).
+
 ## Cible et méthode
 
 Référence locale fournie : `setup_think-cell_38718.exe`, version 14.0.38.718, 166 442 072 octets. Signature Authenticode vérifiée valide lors de l'inspection, signataire think-cell Operations GmbH. SHA-256 : `c8e24510f977f0c48516d6f7e62f04f96d6169557aaf662711f82687ee1f9ebf`.

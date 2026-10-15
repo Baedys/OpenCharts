@@ -69,6 +69,12 @@ public static class OfficeSmoke
             sheets = workbook.Worksheets; sheet = sheets.Item(1); sheet.Name = "Donnees";
             object[,] data = new object[,] {{"Départ",100,0,true},{"Croissance",40,0,false},{"Coûts",-25,0,false},{"Total",115,0,true}};
             cells = sheet.Range["A1:D4"]; cells.Value2 = data;
+            Marshal.FinalReleaseComObject((object)cells); cells = sheet.Range["F1:G3"];
+            cells.Value2 = new object[,] { { "North", 10 }, { "South", 20 }, { null, null } };
+            Marshal.FinalReleaseComObject((object)cells); cells = sheet.Range["I1:J40"];
+            object[,] tallData = new object[40, 2];
+            for (int i = 0; i < 40; i++) { tallData[i, 0] = "C" + i; tallData[i, 1] = i == 0 ? 1000 : .1; }
+            cells.Value2 = tallData;
             workbook.SaveAs(xlsx, 51);
             Marshal.FinalReleaseComObject((object)cells); cells = null;
             Marshal.FinalReleaseComObject((object)sheet); sheet = null;
@@ -80,6 +86,19 @@ public static class OfficeSmoke
             linked.Title = "Lien Excel · actualisation manuelle"; linked.WorkbookPath = xlsx; linked.Worksheet = "Donnees"; linked.RangeAddress = "A1:D4";
             linked = ExcelLink.Read(linked);
             Check(linked.Rows.Count == 4 && linked.Rows[0].Label == "Départ" && linked.Rows[2].Value == -25 && linked.Rows[3].Total, "Excel import failed.");
+            ChartSpec pieLink = ChartSamples.Create("Pie"); pieLink.WorkbookPath = xlsx; pieLink.Worksheet = "Donnees"; pieLink.RangeAddress = "F1:G3";
+            pieLink.Pie = new PieOptions { StartAngle = 37, HoleRatio = .4 };
+            pieLink.Pie.Slices.Add(new PieSliceStyle { Index = 2, Color = "#123456", Explode = .2 });
+            string pieBefore = ChartStorage.Serialize(pieLink);
+            ChartSpec pieImported = ExcelLink.Read(pieLink);
+            Check(pieImported.Rows.Count == 2 && pieImported.Pie.Slices.Count == 0 && pieImported.ImportWarnings.Count == 1, "Changed pie row count must reset positional styles with a warning.");
+            Check(pieImported.Pie.StartAngle == 37 && pieImported.Pie.HoleRatio == .4 && ChartStorage.Serialize(pieLink) == pieBefore, "Excel refresh must preserve chart settings without mutating source.");
+            pieImported.Pie.Slices.Add(new PieSliceStyle { Index = 1, Color = "#123456", Explode = .2 });
+            ChartSpec sameCount = ExcelLink.Read(pieImported);
+            Check(sameCount.Pie.Slices.Count == 1 && sameCount.Pie.Slices[0].Index == 1 && sameCount.ImportWarnings.Count == 1, "Unchanged pie row count must retain styles and avoid duplicate warnings.");
+            pieLink.RangeAddress = "I1:J40"; pieLink.Pie.Slices.Clear();
+            ChartSpec tallPie = ExcelLink.Read(pieLink);
+            Check(tallPie.Rows.Count == 40 && ChartEngine.Build(tallPie, 720, 1000).Items.Count > 40, "Excel must validate pie data independently of a fixed 720 by 400 layout.");
             dynamic linkedSlide = deck.Slides.Add(7, 12);
             dynamic old = OfficeRenderer.Render((object)linkedSlide, linked, 30, 45, 900, 450);
             linked.Rows[1].Value = 50; linked.Rows[3].Value = 125;

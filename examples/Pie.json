@@ -1,0 +1,18 @@
+{
+  "Kind": "Pie",
+  "Title": "Répartition synthétique",
+  "Rows": [
+    { "Label": "Europe", "Value": 42 },
+    { "Label": "Amériques", "Value": 31 },
+    { "Label": "Asie", "Value": 22 },
+    { "Label": "Autres", "Value": 5 }
+  ],
+  "Pie": {
+    "StartAngle": -90,
+    "Order": "Descending",
+    "LabelContent": "Both",
+    "ShowCategory": true,
+    "PercentDigits": 0,
+    "Slices": [ { "Index": 3, "Explode": 0.15, "Color": "#AA5A32" } ]
+  }
+}

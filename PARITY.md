@@ -14,7 +14,7 @@ Statuts : **prototype** = réalisation partielle testable ; **absent** = non ré
 | Waterfall | Prototype | Segments multiples, `e`, contraintes exactes, connecteurs/ancrages modifiables et total à gauche réalisés ; poignées natives et cibles physiques de segments réalisées ; création directe des liens et ancrage physique à zéro réalisés ; règles automatiques générales et parité des gestes restantes |
 | Colonnes et barres | Prototype | Groupées, empilées, 100 % et séries multiples réalisées ; un profil empilé comparé localement, généralisation et interactions restantes |
 | Courbes et aires | Prototype / absent | Courbes multi-séries avec interruption aux données absentes ; dates, aires et combinaisons restantes |
-| Secteurs et anneaux | Absent | Angles, trous, labels et petits segments |
+| Secteurs et anneaux | Prototype | Rotation, quatre ordres, trous transparents, explosions et labels externes réalisés ; gestes sur diapositive, labels intérieurs et comparaison de référence restants. Voir PIE.md |
 | Dispersion et bulles | Absent | Axes numériques, surface des bulles, quadrants, régressions |
 | Mekko | Prototype | Nombre arbitraire de segments et axes unitaires |
 | Gantt | Prototype | Calendrier, semaines ISO, jours non ouvrés, jalons, dépendances |
@@ -61,6 +61,7 @@ Les captures de référence et leurs résultats restent séparés du code distri
 
 - [Catalogue graphique](https://www.think-cell.com/en/product/think-cell-charts)
 - [Waterfall](https://www.think-cell.com/en/resources/manual/waterfall)
+- [Secteurs et anneaux](https://www.thinkcell.com/en/resources/manual/pie)
 - [Gantt](https://www.think-cell.com/en/resources/manual/gantt)
 - [Gestion des liens Excel](https://www.think-cell.com/en/resources/manual/manage-data-links)
 - [Disposition automatique](https://www.think-cell.com/en/resources/manual/automatic-layout)

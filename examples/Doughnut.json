@@ -1,0 +1,18 @@
+{
+  "Kind": "Doughnut",
+  "Title": "Anneau synthétique",
+  "Rows": [
+    { "Label": "Produit A", "Value": 55 },
+    { "Label": "Produit B", "Value": 30 },
+    { "Label": "Produit C", "Value": 15 }
+  ],
+  "Pie": {
+    "StartAngle": -90,
+    "HoleRatio": 0.55,
+    "Order": "SheetClockwise",
+    "LabelContent": "Percent",
+    "ShowCategory": true,
+    "CenterTitle": "Total",
+    "Slices": [ { "Index": 0, "Color": "#2F75B5" }, { "Index": 1, "Color": "#70AD47" }, { "Index": 2, "Color": "#ED7D31" } ]
+  }
+}

@@ -13,6 +13,7 @@ namespace OpenSlideCharts
         public string LayoutMode = "Clustered";
         public ChartAppearance Appearance;
         public WaterfallSpec Waterfall;
+        public PieOptions Pie;
         public List<string> ImportWarnings = new List<string>();
     }
     public sealed class ChartRow
@@ -35,6 +36,7 @@ namespace OpenSlideCharts
         public double? MarginLeft, MarginRight;
         public bool NoWrap;
         public string Role, EntityId, ColumnId, SegmentId;
+        public ShapePath Path;
     }
     public sealed class Layout
     {
@@ -73,7 +75,8 @@ namespace OpenSlideCharts
             Layout result = new Layout();
             if (spec.Appearance == null || spec.Appearance.ShowTitle)
                 Text(result, spec.Title ?? spec.Kind, 14, 8, width - 28, 28, 20, Ink, "left");
-            if (spec.Waterfall != null) ConstraintWaterfall(result, spec, width, height);
+            if (kind == "pie" || kind == "doughnut") BuildPie(result, spec, width, height);
+            else if (spec.Waterfall != null) ConstraintWaterfall(result, spec, width, height);
             else if (spec.Series != null && spec.Series.Count > 0) MultiSeries(result, spec, width, height);
             else if (kind == "mekko") Mekko(result, spec, width, height);
             else if (kind == "gantt" || kind == "bar") Horizontal(result, spec, width, height, kind == "gantt");
@@ -85,6 +88,7 @@ namespace OpenSlideCharts
                     item.X + item.W < -.00001 || item.Y + item.H < -.00001 || item.X + item.W > width + .00001 || item.Y + item.H > height + .00001 ||
                     (item.Kind != "line" && (item.W < 0 || item.H < 0)))
                     throw new ArgumentException("Chart geometry exceeds its frame. Leave room around PlotRect for labels and ticks.");
+                if (item.Path != null) ValidatePathFrame(item.Path, width, height);
             }
             return result;
         }
@@ -96,8 +100,14 @@ namespace OpenSlideCharts
             if (!Finite(width) || !Finite(height) || width < (observedPlot ? 1 : 320) || height < (observedPlot ? 1 : 240) || width > 100000 || height > 100000)
                 throw new ArgumentOutOfRangeException("width", "Chart dimensions must be finite, from 320 x 240 to 100000 x 100000 points.");
             string kind = (spec.Kind ?? "").ToLowerInvariant();
-            if (kind != "waterfall" && kind != "column" && kind != "bar" && kind != "line" && kind != "mekko" && kind != "gantt")
-                throw new NotSupportedException("Unsupported chart kind: " + spec.Kind + ". Supported: Waterfall, Column, Bar, Line, Mekko, Gantt.");
+            if (kind != "waterfall" && kind != "column" && kind != "bar" && kind != "line" && kind != "mekko" && kind != "gantt" && kind != "pie" && kind != "doughnut")
+                throw new NotSupportedException("Unsupported chart kind: " + spec.Kind + ". Supported: Waterfall, Column, Bar, Line, Mekko, Gantt, Pie, Doughnut.");
+            if (kind == "pie" || kind == "doughnut")
+            {
+                ValidatePie(spec);
+                return;
+            }
+            if (spec.Pie != null) throw new NotSupportedException("Pie options require Kind=Pie or Doughnut.");
             if (spec.Waterfall != null)
             {
                 if (kind != "waterfall" || spec.Series != null && spec.Series.Count > 0 || spec.Appearance != null)
@@ -273,6 +283,10 @@ namespace OpenSlideCharts
             {
                 Add(spec, "Opening", 100, 0, true); Add(spec, "Sales", 65, 0, false);
                 Add(spec, "Costs", -80, 0, false); Add(spec, "Closing", 85, 0, true);
+            }
+            else if (key == "pie" || key == "doughnut")
+            {
+                Add(spec, "North", 40, 0, false); Add(spec, "South", 35, 0, false); Add(spec, "West", 25, 0, false);
             }
             else if (key == "gantt")
             {

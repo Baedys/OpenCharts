@@ -107,6 +107,10 @@ namespace OpenSlideCharts
                         s.Left = (float)(left + p.X); s.Top = (float)(top + p.Y);
                         s.Width = (float)Math.Max(1, p.W); s.Height = (float)Math.Max(1, p.H);
                     }
+                    else if (p.Kind == "path")
+                    {
+                        s = RenderPath((object)slide, p, left, top);
+                    }
                     else if (p.Kind == "rect" || p.Kind == "ellipse")
                     {
                         s = slide.Shapes.AddShape(p.Kind == "ellipse" ? 9 : 1, (float)(left + p.X), (float)(top + p.Y), (float)Math.Max(.05, p.W), (float)Math.Max(.05, p.H));
@@ -133,6 +137,31 @@ namespace OpenSlideCharts
                 else foreach (string name in names) { try { slide.Shapes.Item(name).Delete(); } catch { } }
                 throw;
             }
+        }
+        private static object RenderPath(object slideObject, Primitive primitive, double left, double top)
+        {
+            ShapePath path = primitive.Path;
+            if (path == null || path.Segments == null || path.Segments.Count == 0)
+                throw new ArgumentException("Un contour fermé est requis pour une forme libre.");
+            dynamic slide = slideObject;
+            // Office's freeform consists of one closed contour. An annular sector
+            // follows the outer arc, then the inner arc in reverse; its hole is
+            // genuinely unfilled, including the coincident seam of a full ring.
+            dynamic builder = slide.Shapes.BuildFreeform(1, (float)(left + path.StartX), (float)(top + path.StartY));
+            foreach (PathSegment segment in path.Segments)
+            {
+                if (segment.Curve)
+                    builder.AddNodes(1, 1, (float)(left + segment.C1X), (float)(top + segment.C1Y),
+                        (float)(left + segment.C2X), (float)(top + segment.C2Y), (float)(left + segment.X), (float)(top + segment.Y));
+                else builder.AddNodes(0, 1, (float)(left + segment.X), (float)(top + segment.Y));
+            }
+            dynamic shape = builder.ConvertToShape();
+            try
+            {
+                shape.Fill.Solid(); shape.Fill.ForeColor.RGB = primitive.Color; shape.Line.Visible = 0;
+                return (object)shape;
+            }
+            catch { try { shape.Delete(); } catch { } throw; }
         }
         public static object Replace(object slideObject, object oldObject, ChartSpec spec)
         { return Replace(slideObject, oldObject, spec, null); }
@@ -200,7 +229,18 @@ namespace OpenSlideCharts
                     }
                     result.Rows.Add(item);
                 }
-                ChartEngine.Build(result, 720, 400);
+                if (result.Pie != null && result.Pie.Slices != null && result.Pie.Slices.Count > 0 && source.Rows != null && source.Rows.Count != result.Rows.Count)
+                {
+                    // Row indexes identify slice styles. A changed row count does
+                    // not establish which source rows were inserted or removed.
+                    result.Pie.Slices.Clear();
+                    if (result.ImportWarnings == null) result.ImportWarnings = new List<string>();
+                    const string warning = "Le nombre de lignes du secteur/anneau a changé : couleurs et éclatements individuels réinitialisés.";
+                    if (!result.ImportWarnings.Contains(warning)) result.ImportWarnings.Add(warning);
+                }
+                if (String.Equals(result.Kind, "Pie", StringComparison.OrdinalIgnoreCase) || String.Equals(result.Kind, "Doughnut", StringComparison.OrdinalIgnoreCase))
+                    ChartEngine.ValidatePie(result);
+                else ChartEngine.Build(result, 720, 400);
                 return result;
             }
             finally

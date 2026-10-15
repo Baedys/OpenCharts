@@ -77,7 +77,7 @@ public static class CoreTests
     private static void Validation()
     {
         Reject(delegate { ChartEngine.Build(null, 640, 360); });
-        Reject(delegate { ChartEngine.Build(Spec("Pie", 1), 640, 360); });
+        Reject(delegate { ChartEngine.Build(Spec("UnsupportedKind", 1), 640, 360); });
         Reject(delegate { ChartEngine.Build(Spec("Column"), 640, 360); });
         Reject(delegate { ChartEngine.Build(Spec("Column", Double.NaN), 640, 360); });
         Reject(delegate { ChartEngine.Build(Spec("Column", Double.PositiveInfinity), 640, 360); });

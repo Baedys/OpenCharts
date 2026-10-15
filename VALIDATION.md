@@ -1,6 +1,18 @@
-# Validation du jalon connecteurs sur diapositive
+# Validation locale
 
 Tests locaux réalisés les 15–16 octobre 2026, sous Windows avec PowerPoint/Excel de bureau x64, version Office 16.0.20430.20146.
+
+## Jalon secteurs et anneaux
+
+- **740 contrôles de géométrie** : contours fermés, sens du trou, aires/proportions, tri stable, couleurs, extrêmes numériques, petits segments, labels denses et glyphes larges. Ces contrôles portent sur notre moteur original.
+- **21 assertions d'éditeur** : conservation des réglages et du lien, isolation du modèle, suppression de lignes, collage TSV transactionnel, changement de type et décimales entières.
+- **1 684 assertions Office, 12 fixtures synthétiques**, processus terminé avec code 0 : formes libres natives, textes, tags, XML des contours, pixels du trou transparent, sauvegarde/réouverture et remplacement transactionnel. Les cas comprennent cercle/anneau complets, tri, explosion, rotation, zéros, valeur `1e-12`, cadre minimal et libellés W/CJK. Largeur et hauteur réelles des textes natifs sont vérifiées avant et après réouverture. Les images ont aussi été inspectées visuellement.
+- **327 assertions de la suite Office standard**, processus terminé avec code 0 : régressions des autres graphiques et nouveaux cas Excel. Les styles individuels sont réinitialisés avec avertissement quand le nombre de lignes change ; ils sont conservés à nombre identique. Un import de 40 lignes destiné à un cadre haut réussit sans imposer artificiellement une disposition 720 × 400.
+- **Parcours interactif à 200 %** : réédition depuis le ruban, champs et en-têtes visibles, trou modifié de 50 % à 60 %, un Undo puis un Redo, géométrie et données relues cohérentes. Le formulaire a été corrigé après détection visuelle d'une mise à l'échelle prématurée. Ce parcours ne vérifie pas tous les contrôles ni tous les gestes.
+
+`Build.ps1 -Test` a également conservé les 3 822 assertions moteur existantes et les suites cascades/interaction/commandes/événements/minuteur/poignées/clavier/éditeur. La dernière modification d'interface a été revérifiée par ses 21 assertions et le parcours Office ci-dessus. Voir [PIE.md](PIE.md) et `Test-Pies.ps1`. Aucune exécution de think-cell ni comparaison de référence secteurs/anneaux n'a été réalisée ; **aucune parité n'est revendiquée**.
+
+## Jalon précédent : connecteurs sur diapositive
 
 | Vérification | Résultat | Limite |
 |---|---|---|

@@ -2,6 +2,14 @@
 
 Vérifications effectuées le 15 octobre 2026 sur PowerPoint Windows x64 16.0.20430.20146. Les graphiques sont synthétiques, créés par OpenCharts. Les gestes utilisent le contrôle Windows Computer Use ; les valeurs et contraintes sont ensuite relues par le modèle objet PowerPoint. Ces parcours ne sont pas une comparaison d'exécution avec think-cell. Les fichiers JSON fournis reprennent les données et contraintes des trois fixtures utilisées ; leur import par dialogue n'a pas été exercé pendant ces gestes.
 
+## Secteurs et anneaux — 16 octobre 2026
+
+Sur le profil Office x64 local à 200 %, le bouton **Modifier les données** du ruban a ouvert l'éditeur d'un anneau synthétique. L'inspection a fait corriger une mise à l'échelle trop tôt dans la construction WinForms, des en-têtes de grille rognés et un contrôle de décimales invisible. Le formulaire final expose les données et tous les champs de réglages sans rognage dans ce parcours.
+
+Le champ du trou est passé de 50 à 60 %. **Appliquer** a régénéré l'anneau ; la relecture du modèle donne `HoleRatio=0.6`. Un Ctrl+Z a rétabli le modèle initial sans options explicites et le trou de 50 % ; un Ctrl+Y a rétabli modèle et trou de 60 %. La présentation synthétique a été sauvegardée et exportée, puis fermée. Aucun document utilisateur n'a été modifié.
+
+Ce parcours ciblé ne constitue pas une couverture de tous les réglages, du collage interactif ni des gestes de référence think-cell. Les 12 fixtures et 1 684 assertions de `tests/PieOffice.cs` couvrent séparément le rendu natif et la sauvegarde/réouverture, sans entrées souris.
+
 ## Total à gauche
 
 Importer [WaterfallLeftTotal.json](examples/WaterfallLeftTotal.json), puis sélectionner le graphique et choisir **Éditer les connecteurs**. Les données sont `e ; 3 ; 2 ; 4`, avec un départ de `e` à zéro et la dernière sortie à zéro. Le résultat initial est `e = −9`.
