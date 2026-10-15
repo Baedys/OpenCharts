@@ -28,7 +28,7 @@ Statuts : **prototype** = réalisation partielle testable ; **absent** = non ré
 | Lien Excel enregistré | Prototype | Noms de plage, erreurs Excel, tableaux structurés et sources déplacées |
 | Lien Excel ouvert | Absent | Données non enregistrées, sélection, reconnexion au classeur |
 | Actualisation automatique | Absent | Événements, états hors ligne, conflits et rafraîchissements groupés |
-| Undo/Redo | Non vérifié | Plusieurs opérations puis annulation/rétablissement sans perte |
+| Undo/Redo | Défaut confirmé / couverture partielle | Ancrage zéro annulé/rétabli en une étape ; glissement natif et recalcul séparés en deux étapes, avec incohérence intermédiaire. Regroupement fiable et autres commandes restants |
 | Redimensionnement | Prototype | Polices et placement identiques à référence ; rotations |
 | Conservation des retouches | Absent | Styles, annotations, animations et interactions après mise à jour |
 | Disposition automatique | Absent | Contraintes d'alignement, boîtes de texte et ajustements de taille |

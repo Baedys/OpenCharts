@@ -65,6 +65,9 @@ Ces probes ne prouvent pas une reproduction exhaustive de l'interface de think-c
 
 ## Sources Microsoft
 
+L'annulation des glissements présente une [limite observée par gestes](UI-VALIDATION.md#undoredo--réussite-limitée-et-défaut-confirmé), distincte du contrat des API ci-dessous.
+
+- [StartNewUndoEntry](https://learn.microsoft.com/en-us/office/vba/api/powerpoint.application.startnewundoentry)
 - [SetTimer](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-settimer)
 - [KillTimer](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-killtimer)
 - [StandardOleMarshalObject](https://learn.microsoft.com/en-us/dotnet/api/system.runtime.interopservices.standardolemarshalobject)

@@ -40,6 +40,18 @@ Le parcours vérifie donc le callback réel des items, le remplacement d'un menu
 
 Les variantes **Connecteur libre**, création depuis Pied/Cumul, placement du pied à zéro, choix de l'autre réparation et **Conserver les ancrages** n'ont pas été exercées par gestes dans cette fixture. Les tests de modèle couvrent leur politique de contraintes ; cela ne remplace pas leurs futurs parcours UI.
 
+## Undo/Redo : réussite limitée et défaut confirmé
+
+Essais complémentaires des 15–16 octobre 2026 sur la même installation Office, code du commit `9a9976a`. Fixtures et activation de l'éditeur préparées par le harness COM ; glissement, Ctrl+Z et Ctrl+Y réalisés avec les entrées Windows réelles.
+
+Sur les deux sommes indépendantes, **Placer le sommet à zéro** sur C0 remplace P0 par une ancre manuelle C0 `[1]`. Un Ctrl+Z restaure P0/P1 automatiques, les valeurs 3 et 5 et les sorties initiales. Un Ctrl+Y rétablit l'ancre manuelle avec son même ID et le rendu attendu. La session se termine lors de l'annulation et reste inactive après rétablissement. Ce test couvre une commande, sans séquence de plusieurs éditions.
+
+Sur le total à gauche `e ; 3 ; 2 ; 4`, déplacer la poignée droite du premier lien vers la sortie de C3 produit `e = +9`. Un premier Ctrl+Z rétablit le modèle initial, `e = −9`, mais restaure l'ancienne ligne telle qu'elle était juste avant régénération : sa poignée droite est encore sur C3. Le rendu et les contraintes sont donc incohérents. Un second Ctrl+Z rétablit le connecteur initial vers la base de C1. Deux Ctrl+Y successifs reproduisent cet état intermédiaire puis le résultat cohérent `e = +9`, ancre droite C3 `[1]`. Ce cycle complet a été vérifié sur le code publié ; les données numériques et la définition calculée de `e` sont conservées.
+
+**Ce défaut reste ouvert.** Dans ce scénario, terminer les deux étapes restaure la cohérence ; cela ne garantit pas un nombre fixe d'étapes pour tout historique Office. Ne pas enregistrer un état intermédiaire incohérent. Aucun Undo automatique supplémentaire n'est lancé par le complément : il pourrait annuler une autre action de l'utilisateur.
+
+Une variante privée supprimant `StartNewUndoEntry` avant la régénération a présenté le même défaut et n'est pas retenue. La [documentation Microsoft](https://learn.microsoft.com/en-us/office/vba/api/powerpoint.application.startnewundoentry) décrit la création d'une entrée, sans contrat de fusion rétroactive. L'interface native et les formes seules ne suffisent donc pas à prouver une annulation atomique. Les 53 assertions COM restent valides dans leur périmètre ; elles ne testaient pas ces frappes Undo/Redo.
+
 ## Limites de la preuve
 
 Les clics droits automatisés initiaux ont ouvert le menu Office sans callback `WindowBeforeRightClick`, aussi bien via `ComEventsHelper` que via un abonnement PIA Microsoft séparé et pompé. Les clics gauches ont livré `WindowSelectionChange`. Ces observations ne déterminent pas si l'origine tient à l'injection d'entrée, au contexte Office ou à un autre facteur ; elles ne prouvent pas que l'événement serait universellement absent. Le menu Ribbon XML fournit donc les commandes sans dépendre de sa livraison. Le complément ne branche plus l'ancien menu géré sur cet événement ; la méthode publique est conservée comme API obsolète.

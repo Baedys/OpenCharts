@@ -66,6 +66,8 @@ Sélectionner une cascade à contraintes puis **Éditer les connecteurs** expose
 
 ## Limites importantes
 
+**Undo/Redo après glissement d'une poignée reste défectueux.** Le geste natif et le recalcul forment deux étapes Office : après un seul Ctrl+Z, le modèle est restauré mais la ligne peut rester déplacée. Dans le scénario testé, un second Ctrl+Z restaure l'ensemble ; deux Ctrl+Y rétablissent le résultat. Ne pas enregistrer l'état intermédiaire. L'annulation d'un ancrage à zéro a fonctionné en une étape dans un test distinct. Détails et limites dans [UI-VALIDATION.md](UI-VALIDATION.md).
+
 Cette version n'édite pas les objets propriétaires think-cell. Son menu contextuel se limite aux cascades ; le menu radial complet et le placement automatique restent à réaliser. Le moteur ne gère pas encore les secteurs/anneaux, les graphiques combinés, les dates calendaires ou les ruptures d'axe. L'actualisation n'est pas automatique et ne lit pas les modifications Excel non enregistrées.
 
 La réédition régénère les formes ; les personnalisations manuelles et animations des formes internes ne sont pas conservées. Les groupes doivent être sans rotation pour être réédités. La disposition par défaut exige au moins 320 × 240 points ; une zone de tracé explicite importée permet des cadres plus petits, sous réserve que la géométrie finale reste dans le cadre. Changer le type ou le mode rétablit la disposition standard : agrandir d’abord les petits groupes à au moins 320 × 240 points. L’éditeur valide les dimensions avant de fermer. Un groupe dissocié perd sa fonction d’édition structurée.

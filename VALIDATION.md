@@ -56,6 +56,7 @@ Le collage valide les données avant de changer la grille ; l'application valide
 
 ## Restant à vérifier
 
+- Corriger l'incohérence géométrie/modèle après un seul Undo d'un glissement : défaut reproduit par gestes, décrit dans [UI-VALIDATION.md](UI-VALIDATION.md). Le cycle d'un ancrage zéro fonctionne dans un cas distinct ; cela ne valide pas Undo/Redo global.
 - Parcours réels des éditeurs, collage pendant l'édition d'une cellule et commandes du ruban.
 - Généralisation des gestes au-delà des trois scénarios de [UI-VALIDATION.md](UI-VALIDATION.md), autres choix et annulations, glissements prolongés et écrans multiples.
 - Undo/Redo, copie interprésentations, modifications manuelles et autres versions d'Office.
