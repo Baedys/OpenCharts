@@ -68,7 +68,7 @@ namespace OpenSlideCharts
             try { if (slideEditor != null) slideEditor.Stop(true); InvalidateRibbon(); if (disconnectPending) DisconnectInteractions(); }
             catch (Exception error) { cancel = true; interactionError = error.Message; MessageBox.Show("L'édition des connecteurs n'a pas pu être terminée. Réessayez après avoir terminé l'édition.\n" + error.Message, "OpenSlideCharts", MessageBoxButtons.OK, MessageBoxIcon.Warning); }
         }
-        public string DiagnosticStatus() { return "OpenSlideCharts 0.1; connected=" + (app != null) + "; ribbon=" + ribbonRequested + "; events=" + (events != null) + "; connector-editing=" + (slideEditor != null && slideEditor.Active) + "; connector-adding=" + (slideEditor != null && slideEditor.AddingConnector) + "; edits=" + (slideEditor == null ? 0 : slideEditor.AppliedEdits) + "; polls=" + (slideEditor == null ? 0 : slideEditor.PollCount) + "; interaction=" + (interactionError ?? (slideEditor == null ? "" : slideEditor.LastMessage)); }
+        public string DiagnosticStatus() { return "OpenSlideCharts 0.1; connected=" + (app != null) + "; ribbon=" + ribbonRequested + "; events=" + (events != null) + "; connector-editing=" + (slideEditor != null && slideEditor.Active) + "; connector-adding=" + (slideEditor != null && slideEditor.AddingConnector) + "; interface-handles=" + (slideEditor != null && slideEditor.InterfaceHandlesVisible) + "; edits=" + (slideEditor == null ? 0 : slideEditor.AppliedEdits) + "; polls=" + (slideEditor == null ? 0 : slideEditor.PollCount) + "; interaction=" + (interactionError ?? (slideEditor == null ? "" : slideEditor.LastMessage)); }
         public string GetCustomUI(string ribbonId)
         {
             ribbonRequested = true;

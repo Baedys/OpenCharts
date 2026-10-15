@@ -6,8 +6,8 @@ using System.Windows.Forms;
 
 namespace OpenSlideCharts
 {
-    // Edits the chart's real native PowerPoint connectors. No helper shapes are
-    // inserted into the document; valid endpoint changes update its model.
+    // Window handles commit one model edit per gesture. Native connector edits
+    // remain available as a fallback. Neither path inserts document helper shapes.
     public sealed partial class WaterfallSlideEditor : IDisposable
     {
         [DllImport("user32.dll")]
@@ -46,27 +46,37 @@ namespace OpenSlideCharts
             if (timer != null) return;
             timer = new PowerPointTimer((object)app, delegate
             {
-                try { PollCount++; if (leaveRequested && Active) Stop(true); else if (AddingConnector) PollConnectorCreation(); else ProcessPendingEdits(false); }
-                catch (Exception error) { LastMessage = Describe(error); if (timer != null) timer.Stop(); }
+                try { PollCount++; if (leaveRequested && Active) Stop(true); else if (AddingConnector) PollConnectorCreation(); else ProcessPendingEdits(false); UpdateInterfaceHandles(); }
+                catch (Exception error) { LastMessage = Describe(error); HideInterfaceHandles(); if (timer != null) timer.Stop(); }
             }, delegate(Exception error) { LastMessage = Describe(error); });
         }
         public void Start(object slideObject, object chartObject, string connectorId = null)
         {
             bool reuse = Active && SameObject(chart, chartObject);
             object finished = Stop(true); if (reuse) chartObject = finished;
-            dynamic group = chartObject;
-            ChartSpec candidate = ChartStorage.Read(chartObject);
-            if (candidate.Waterfall == null) throw new ArgumentException("Sélectionnez une cascade à connecteurs.");
-            if ((int)group.Child != 0 || Math.Abs((double)group.Rotation) > .01)
-                throw new NotSupportedException("L'édition des connecteurs exige un groupe sans rotation, directement sur la diapositive.");
-            scene = WaterfallScene.Build(candidate.Waterfall, (double)group.Width, (double)group.Height);
-            chart = chartObject; slide = slideObject; spec = candidate;
-            left = group.Left; top = group.Top; width = group.Width; height = group.Height;
-            token = Guid.NewGuid().ToString("N").ToUpperInvariant(); currentId = connectorId; leaveRequested = false;
+            // A selection wrapper can outlive a PowerPoint Undo. Read the current
+            // top-level shape from its slide before traversing GroupItems again.
+            dynamic requested = chartObject;
+            if ((int)requested.Child != 0 || !SameObject((object)requested.Parent, slideObject))
+                throw new ArgumentException("Le graphique n'appartient pas à cette diapositive.");
+            int requestedId = requested.Id; object currentChart = null; dynamic currentSlide = slideObject;
+            for (int i = 1; i <= (int)currentSlide.Shapes.Count; i++)
+            { dynamic item = currentSlide.Shapes.Item(i); if ((int)item.Id == requestedId) { currentChart = item; break; } }
+            if (currentChart == null) throw new InvalidOperationException("Le graphique n'existe plus sur cette diapositive.");
+            chartObject = currentChart;
             bool previousBusy = busy; busy = true;
             try
             {
-                EnsureTimer();
+                dynamic group = chartObject;
+                ChartSpec candidate = ChartStorage.Read(chartObject);
+                if (candidate.Waterfall == null) throw new ArgumentException("Sélectionnez une cascade à connecteurs.");
+                if ((int)group.Child != 0 || !Upright(chartObject))
+                    throw new NotSupportedException("L'édition des connecteurs exige un groupe sans rotation ni retournement, directement sur la diapositive.");
+                scene = WaterfallScene.Build(candidate.Waterfall, (double)group.Width, (double)group.Height);
+                chart = chartObject; slide = slideObject; spec = candidate;
+                left = group.Left; top = group.Top; width = group.Width; height = group.Height;
+                token = Guid.NewGuid().ToString("N").ToUpperInvariant(); currentId = connectorId; leaveRequested = false;
+                EnsureTimer(); editWindow = (object)app.ActiveWindow;
                 bool tagged = false, segmentsTagged = false;
                 for (int i = 1; i <= (int)group.GroupItems.Count; i++)
                 {
@@ -79,8 +89,19 @@ namespace OpenSlideCharts
                 BuildHandles();
                 leaveRequested = false; timer.Start(); LastMessage = "Déplacez une extrémité du connecteur vers un niveau de colonne.";
             }
-            catch { Stop(false); throw; }
+            catch (Exception error)
+            {
+                // Startup has no pending pointer mutation to restore. Do not query
+                // an invalid COM group again or hide the original exception.
+                chart = null; slide = null; spec = null; scene = null; token = null; currentId = null; pendingSource = null;
+                lines.Clear(); choosing = false; leaveRequested = false;
+                try { if (timer != null) timer.Stop(); } catch (Exception cleanup) { error.Data["TimerCleanup"] = cleanup; }
+                try { DisposeInterface(); } catch (Exception cleanup) { error.Data["InterfaceCleanup"] = cleanup; }
+                try { CloseCommandMenu(); } catch (Exception cleanup) { error.Data["MenuCleanup"] = cleanup; }
+                throw;
+            }
             finally { busy = previousBusy; }
+            UpdateInterfaceHandles();
         }
         private void BuildHandles()
         {
@@ -116,6 +137,7 @@ namespace OpenSlideCharts
         }
         public object Stop(bool applyPending = true, bool selectChart = false)
         {
+            interfaceInputEnabled = false;
             if (applyPending && Active && !busy && !choosing) ProcessPendingEdits(true);
             if (timer != null) timer.Stop(); bool previous = busy; busy = true;
             try
@@ -124,7 +146,7 @@ namespace OpenSlideCharts
                 object selected = chart;
                 chart = null; slide = null; spec = null; scene = null; token = null; currentId = null; pendingSource = null;
                 lines.Clear(); choosing = false; leaveRequested = false;
-                CloseCommandMenu();
+                DisposeInterface(); CloseCommandMenu();
                 if (selectChart && selected != null) ((dynamic)selected).Select();
                 return selected;
             }
@@ -159,10 +181,11 @@ namespace OpenSlideCharts
             }
             catch (COMException error) { if (!IsBusy(error)) SafeStop(); }
             catch { SafeStop(); }
+            finally { if (Active && !busy && !choosing) { try { UpdateInterfaceHandles(); } catch { HideInterfaceHandles(); } } }
         }
         public bool ProcessPendingEdits(bool force = true)
         {
-            if (!Active || busy || choosing || AddingConnector || currentId == null) return false;
+            if (!Active || busy || choosing || AddingConnector || currentId == null || InterfaceDragging) return false;
             bool beforeSuppress = suppressSelection;
             busy = true;
             try
@@ -170,7 +193,7 @@ namespace OpenSlideCharts
                 if (!ChartExists()) { Stop(false); return false; }
                 dynamic group = chart;
                 if (!IsActiveSlide()) { force = true; suppressSelection = true; leaveRequested = true; }
-                if (!FrameUnchanged() || Math.Abs((double)group.Rotation) > .01)
+                if (!FrameUnchanged() || !Upright(chart))
                 { LastMessage = "Session terminée : cadre modifié."; Stop(false); return false; }
                 EditLine line = lines[currentId]; dynamic live = FindLine(line.ShapeId);
                 // A stationary pause with the mouse button held is still a drag.
@@ -300,6 +323,8 @@ namespace OpenSlideCharts
             dynamic bounds = ((dynamic)chart).GroupItems.Item(1);
             return Math.Abs((double)bounds.Left - left) <= .1 && Math.Abs((double)bounds.Top - top) <= .1 && Math.Abs((double)bounds.Width - width) <= .1 && Math.Abs((double)bounds.Height - height) <= .1;
         }
+        private static bool Upright(object shape)
+        { dynamic item = shape; return Math.Abs((double)item.Rotation) <= .01 && (int)item.HorizontalFlip == 0 && (int)item.VerticalFlip == 0; }
         private bool IsActiveSlide()
         {
             try { return SameObject((object)app.ActiveWindow.View.Slide, slide); }

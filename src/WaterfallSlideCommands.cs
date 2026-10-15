@@ -111,13 +111,13 @@ namespace OpenSlideCharts
         }
         private void RequireCommandChart()
         {
-            if (!Active || !ChartExists() || !IsActiveSlide() || !FrameUnchanged() || Math.Abs((double)((dynamic)chart).Rotation) > .01)
+            if (!Active || !ChartExists() || !IsActiveSlide() || !FrameUnchanged() || !Upright(chart))
                 throw new InvalidOperationException("La sélection ou le cadre a changé. Recommencez la commande.");
         }
         private void PollConnectorCreation()
         {
             if (!Active || busy) return;
-            if (!ChartExists() || !IsActiveSlide() || !FrameUnchanged() || Math.Abs((double)((dynamic)chart).Rotation) > .01 || (GetAsyncKeyState(27) & 0x8000) != 0)
+            if (!ChartExists() || !IsActiveSlide() || !FrameUnchanged() || !Upright(chart) || (GetAsyncKeyState(27) & 0x8000) != 0)
             { bool before = suppressSelection; suppressSelection = true; try { Stop(false); } finally { suppressSelection = before; } return; }
             if (!choosing)
             {

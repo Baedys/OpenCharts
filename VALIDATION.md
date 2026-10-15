@@ -1,6 +1,6 @@
 # Validation du jalon connecteurs sur diapositive
 
-Tests locaux réalisés le 15 octobre 2026, sous Windows avec PowerPoint/Excel de bureau x64, version Office 16.0.20430.20146.
+Tests locaux réalisés les 15–16 octobre 2026, sous Windows avec PowerPoint/Excel de bureau x64, version Office 16.0.20430.20146.
 
 | Vérification | Résultat | Limite |
 |---|---|---|
@@ -10,6 +10,9 @@ Tests locaux réalisés le 15 octobre 2026, sous Windows avec PowerPoint/Excel d
 | Création de connecteurs et ancrages zéro | 14 scénarios, 66 assertions réussies | Politique de reconstruction explicite ; pas de priorité native revendiquée |
 | Pont d’événements COM | 55 contrôles gérés réussis | Cycle de vie testé sans Office ; transport réel couvert séparément |
 | Minuteur de thread | 16 contrôles réussis | STA local pompé, sans HWND ; exécution Office couverte séparément |
+| Poignées d’interface | 34 contrôles WinForms locaux réussis | Capture, géométrie, owner, annulation et destruction ; pas de gestes Office |
+| Projection écran | 32 contrôles réussis | Échelles synthétiques et coordonnées négatives ; pas de garantie multi-écran |
+| Clavier d’édition | 22 scénarios, 146 assertions réussies | Routage injecté, cycle de vie et hook réel sur STA isolé ; pas de touches Office injectées par ces tests |
 | Interactions Office | 53 assertions réussies, processus terminé avec code 0 | Formes natives et événements COM ; pas de glissement de souris injecté |
 | Préservation des données dans les éditeurs | 25 assertions réussies | Formulaires instanciés sans parcours interactif |
 | Lecteur et convertisseur Python | 58 tests réussis | Fixtures synthétiques, pas un corpus exhaustif |
@@ -17,6 +20,8 @@ Tests locaux réalisés le 15 octobre 2026, sous Windows avec PowerPoint/Excel d
 | Chargement COM/ruban | `connected=True; ribbon=True` | Les clics sur tous les boutons restent à tester |
 | Inspection des exemples fournis | 32 contrôles privés réussis, hashes inchangés | Trois présentations, cinq modèles de graphiques |
 | Bibliothèque de types native | 905 déclarations de fonctions et 11 GUIDs comparés, zéro divergence | Déclarations, pas 905 fonctionnalités utilisateur ; voir INTEROP.md |
+
+Les poignées d’interface ajoutent 212 contrôles locaux (34 fenêtre, 32 projection, 146 clavier). Le parcours intégré vérifie un cycle Undo/Redo complet sur le total à gauche, l’annulation sans édition du choix Base/Cumul, son choix Base puis Undo, le menu natif depuis la poignée et le masquage/rétablissement après zoom. Le PPTX sauvegardé pendant une session contient un groupe, trois tags de connecteurs de cascade et aucun tag auxiliaire `OSC_EDIT`. Le XML compte dix objets `cxnSp`, car axes et grille emploient aussi des lignes natives. Les détails et les limites de ces gestes figurent dans [UI-VALIDATION.md](UI-VALIDATION.md). La suite COM de 53 assertions a aussi réussi pendant cette intégration ; ses actions utilisent les formes natives, pas les entrées de la souris.
 
 L'intégration vérifie les groupes de formes, les métadonnées, le remplacement transactionnel, la lecture et l'actualisation Excel, les matrices multi-séries et les données après réouverture. Sept variantes multi-séries sont couvertes : colonnes et barres groupées/empilées/100 %, courbe groupée. Un cas synthétique de 220 × 104 points vérifie le cadre importé et les positions/dimensions de chaque zone de texte, avant et après sauvegarde/réouverture. Les textes sans retour automatique à la ligne conservent leur géométrie. Trois cascades synthétiques ajoutent des segments multiples, des `e`, un total à gauche, des signes mixtes et un connecteur libre oblique. La suite vérifie le recalcul après remplacement, le refus transactionnel d’ancrages incompatibles et la conservation des données, contraintes et zones de texte après réouverture.
 
@@ -56,7 +61,7 @@ Le collage valide les données avant de changer la grille ; l'application valide
 
 ## Restant à vérifier
 
-- Corriger l'incohérence géométrie/modèle après un seul Undo d'un glissement : défaut reproduit par gestes, décrit dans [UI-VALIDATION.md](UI-VALIDATION.md). Le cycle d'un ancrage zéro fonctionne dans un cas distinct ; cela ne valide pas Undo/Redo global.
+- Étendre la validation Undo/Redo des poignées d’interface au-delà du total à gauche et corriger le repli par modification native directe, qui conserve son défaut d’incohérence après un seul Undo. Voir [UI-VALIDATION.md](UI-VALIDATION.md).
 - Parcours réels des éditeurs, collage pendant l'édition d'une cellule et commandes du ruban.
 - Généralisation des gestes au-delà des trois scénarios de [UI-VALIDATION.md](UI-VALIDATION.md), autres choix et annulations, glissements prolongés et écrans multiples.
 - Undo/Redo, copie interprésentations, modifications manuelles et autres versions d'Office.

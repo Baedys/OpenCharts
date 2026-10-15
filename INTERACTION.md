@@ -1,16 +1,20 @@
 # Interactions PowerPoint : provenance et validation
 
-## Connecteurs natifs
+## Poignées d’interface et connecteurs natifs
 
 L'éditeur agit sur les véritables connecteurs PowerPoint du groupe graphique. Le rôle `WATERFALL_CONNECTOR`, l'index de primitive `OSC_ITEM` et l'identifiant du connecteur dans le modèle permettent de retrouver chaque forme. La session conserve également l'identifiant PowerPoint de la forme ; un nom identique ne suffit pas à identifier un connecteur.
 
-L'activation sélectionne un connecteur et expose ses poignées natives. Un déplacement d'extrémité recherche une base, un cumul ou un bord de segment voisin, puis modifie les contraintes du modèle. Les cellules `e` restent des inconnues calculées. Une cible ambiguë ouvre un choix explicite. Le déplacement des deux extrémités en même temps est refusé. La suppression d'un connecteur met à jour le modèle et recalcule les sommes.
+L’activation sélectionne un connecteur natif et superpose deux poignées WinForms sans activation de fenêtre. Pendant le glissement, seule cette fenêtre est modifiée ; au relâchement, une résolution valide déclenche un seul remplacement du graphique. Un clic sans mouvement ou une cible identique ne crée aucune édition. Un déplacement d'extrémité recherche une base, un cumul ou un bord de segment voisin, puis modifie les contraintes du modèle. Les cellules `e` restent des inconnues calculées. Une cible ambiguë ouvre un choix explicite. Le déplacement des deux extrémités en même temps est refusé. La suppression d'un connecteur met à jour le modèle et recalcule les sommes.
 
-Un minuteur Win32 de thread (`SetTimer(NULL, 0, 200, callback)`) observe la géométrie sur le STA Office. Il ne dépend pas d'un HWND de document. Après détection d'un changement, deux observations stables supplémentaires permettent de l'appliquer automatiquement. Le maintien du bouton gauche suspend l'analyse automatique ; après relâchement, la stabilité est vérifiée. Ce mécanisme ne représente pas un événement Office de fin de glissement et ne prouve pas encore tous les gestes interactifs. Le bouton d'application force aussi l'analyse du déplacement courant.
+Un minuteur Win32 de thread (`SetTimer(NULL, 0, 200, callback)`) actualise la projection écran et observe aussi les modifications natives de repli sur le STA Office. L’observation native est suspendue pendant un glissement d’interface. Il ne dépend pas d'un HWND de document. Après détection d'un changement, deux observations stables supplémentaires permettent de l'appliquer automatiquement. Le maintien du bouton gauche suspend l'analyse automatique ; après relâchement, la stabilité est vérifiée. Ce mécanisme ne représente pas un événement Office de fin de glissement et ne prouve pas encore tous les gestes interactifs. Le bouton d'application force aussi l'analyse du déplacement courant.
 
-Les menus natifs Office des groupes, formes et connecteurs incluent un sous-menu OpenCharts filtré sur la sélection. Le ruban est invalidé après les changements de sélection, les actions d'édition et la fin avant sauvegarde. Le complément ne branche plus son ancien menu géré sur `WindowBeforeRightClick` : cette méthode publique reste obsolète pour compatibilité d'API. Le menu natif propose données, édition/suppression des connecteurs, création depuis un segment, placement du sommet/pied à zéro et fin de session. L'éditeur exige un groupe sans rotation, directement sur la diapositive. La parité complète du menu, de la rotation, des conflits et des gestes de think-cell n'est pas établie.
+Les menus natifs Office des groupes, formes et connecteurs incluent un sous-menu OpenCharts filtré sur la sélection. Le ruban est invalidé après les changements de sélection, les actions d'édition et la fin avant sauvegarde. Le complément ne branche plus son ancien menu géré sur `WindowBeforeRightClick` : cette méthode publique reste obsolète pour compatibilité d'API. Le menu natif propose données, édition/suppression des connecteurs, création depuis un segment, placement du sommet/pied à zéro et fin de session. L’éditeur exige un groupe sans rotation ni retournement, directement sur la diapositive. La parité complète du menu, de la rotation, des conflits et des gestes de think-cell n'est pas établie.
 
-Aucune forme temporaire de poignée n'est ajoutée au document. Une première version fondée sur des connecteurs auxiliaires a été abandonnée après observation de leur persistance lors d'un `SaveAs` automatisé. Ses tests de nettoyage ont été retirés du livrable : ils ne valident pas cette architecture.
+La fenêtre `ConnectorHandleOverlay` conserve la capture uniquement pendant le glissement. Capture perdue, masquage, changement de géométrie ou fin de session annulent ce geste sans modifier le modèle. Le choix d’une cible ambiguë n’écrit rien avant validation ; fermer ce menu conserve le document. La projection utilise `PointsToScreenPixelsX/Y`. Le cadre doit tenir dans le client `MDIClient`, avec marge et exclusion des volets Plan/Notes en vue normale selon `SplitHorizontal/Vertical`. Les quatre coins doivent également appartenir au graphique selon `RangeFromPoint` ; cette API seule ne garantit pas la visibilité. Sinon les poignées sont masquées. Cette politique conservatrice exclut les graphiques partiellement visibles. Les profils de fenêtres `PPTFrameClass`, `MDIClient` et de focus `mdiClass` ont été observés sur l’Office installé ; les autres profils restent à valider.
+
+`OfficeEditKeys` installe un hook `WH_KEYBOARD` uniquement sur le thread Office créateur. Il consomme Échap/Suppr sans modificateur lorsque le focus et la session conviennent. Les pressions appartenant à un menu natif sont laissées à Office. Les callbacks applicatifs passent ensuite par une fenêtre `HWND_MESSAGE` : aucun accès COM ni modification de document ne s’exécute dans le hook. Les répétitions et le relâchement d’une pression prise en charge restent consommés. Échap annule un glissement ; Suppr hors glissement supprime le connecteur par une commande de modèle. Les champs du ruban et des volets ne sont pas des cibles clavier admises.
+
+Aucune forme temporaire de poignée n’est ajoutée au document. Une première version fondée sur des connecteurs auxiliaires a été abandonnée après observation de leur persistance lors d'un `SaveAs` automatisé. Ses tests de nettoyage ont été retirés du livrable : ils ne valident pas cette architecture.
 
 ## Origine du pont d'événements
 
@@ -31,6 +35,8 @@ Le booléen par référence conserve le contrat d'annulation Office. Les délég
 La classe COM `Connect` dérive de `StandardOleMarshalObject` pour que les appels COM externes passent par le STA de création du complément. Le marshaler CLR par défaut laisse les objets gérés exposés à COM être appelés depuis d'autres threads ; cette différence peut créer un minuteur sans boucle de messages et rendre ses observations inactives. Le contrat de thread reste vérifié lors du démarrage, de l'arrêt et de la libération du minuteur.
 
 Les changements de sélection peuvent résulter du code lui-même : le contrôleur protège ses opérations contre les callbacks réentrants. Les événements de sauvegarde et de fermeture terminent la session ; une erreur remontée à ces callbacks peut annuler l'opération concernée. Ce mécanisme n'est pas une garantie couvrant toute écriture de fichier.
+
+Une sélection restaurée par Undo peut conserver une référence dont les enfants ne sont plus lisibles. À l’activation, le contrôleur vérifie la diapositive propriétaire, relit le groupe courant par son ID puis protège toute publication de session avec `busy`. Un échec de démarrage nettoie l’état local et conserve l’exception initiale. Les lectures d’affichage `RangeFromPoint` sont consultatives : un échec COM masque les poignées et permet une nouvelle observation ultérieure.
 
 ## Sauvegardes : observation et limite
 
@@ -65,9 +71,13 @@ Ces probes ne prouvent pas une reproduction exhaustive de l'interface de think-c
 
 ## Sources Microsoft
 
-L'annulation des glissements présente une [limite observée par gestes](UI-VALIDATION.md#undoredo--réussite-limitée-et-défaut-confirmé), distincte du contrat des API ci-dessous.
+Le repli par modification native conserve une [limite observée par gestes](UI-VALIDATION.md#undoredo--réussite-limitée-et-défaut-confirmé), distincte du contrat des API ci-dessous.
 
 - [StartNewUndoEntry](https://learn.microsoft.com/en-us/office/vba/api/powerpoint.application.startnewundoentry)
+- [PointsToScreenPixelsX](https://learn.microsoft.com/en-us/office/vba/api/powerpoint.documentwindow.pointstoscreenpixelsx)
+- [RangeFromPoint](https://learn.microsoft.com/en-us/office/vba/api/powerpoint.documentwindow.rangefrompoint)
+- [SplitHorizontal](https://learn.microsoft.com/en-us/office/vba/api/powerpoint.documentwindow.splithorizontal)
+- [SplitVertical](https://learn.microsoft.com/en-us/office/vba/api/powerpoint.documentwindow.splitvertical)
 - [SetTimer](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-settimer)
 - [KillTimer](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-killtimer)
 - [StandardOleMarshalObject](https://learn.microsoft.com/en-us/dotnet/api/system.runtime.interopservices.standardolemarshalobject)

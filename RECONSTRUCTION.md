@@ -99,3 +99,8 @@ Le helper `0x181a8cd90` enregistre un offset par variable. Il appelle deux diagn
 | Appelant à deux états | `0x1819e73a0` | `ev_e481d0a1de6e6d67cd50d27f03d76f48ba04088abcbe681c63d7178ab7d4ef53` |
 
 La requête initiale `0x1818e0b6f` a été résolue à l'entrée canonique `0x1818e0980`. Types et signatures sont inférés, sans PDB. Les appels indirects restent partiellement non résolus ; des hypothèses de fonctions sans retour peuvent retirer des branches. L'extraction de p-code du plus gros appelant est tronquée, donc aucune preuve complète de flux entre fonctions n'est revendiquée. Choix de l'extrémité initiale, précédence des ancrages et traitement général des conflits restent inconnus.
+
+
+### Geste de connecteur et Undo : reconstruction par fenêtre
+
+Le nouveau parcours est une implémentation C#/WinForms originale : capture du pointeur dans une fenêtre transparente, aperçu hors document, résolution du modèle puis un remplacement à la validation. Il ne reproduit aucun gestionnaire Undo interne du binaire de référence. L’observation du double Undo des formes natives a motivé cette architecture ; les essais du complément intégré établissent une annulation cohérente dans les fixtures précisées dans [UI-VALIDATION.md](UI-VALIDATION.md), sans prouver le mécanisme propriétaire ni la parité générale. Aucun code décompilé ou composant propriétaire n’est distribué.

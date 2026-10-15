@@ -35,6 +35,18 @@ if ($Test) {
     if ($LASTEXITCODE -ne 0) { throw 'PowerPoint timer test build failed.' }
     & (Join-Path $bin 'PowerPointTimerTests.exe')
     if ($LASTEXITCODE -ne 0) { throw 'PowerPoint timer tests failed.' }
+    & $compiler /nologo /target:exe '/r:System.Windows.Forms.dll' '/r:System.Drawing.dll' ('/r:' + (Join-Path $bin 'OpenSlideCharts.dll')) ('/out:' + (Join-Path $bin 'ConnectorHandleOverlayTests.exe')) (Join-Path $root 'tests\ConnectorHandleOverlayTests.cs')
+    if ($LASTEXITCODE -ne 0) { throw 'Connector overlay test build failed.' }
+    & (Join-Path $bin 'ConnectorHandleOverlayTests.exe')
+    if ($LASTEXITCODE -ne 0) { throw 'Connector overlay tests failed.' }
+    & $compiler /nologo /target:exe '/r:System.Drawing.dll' ('/r:' + (Join-Path $bin 'OpenSlideCharts.dll')) ('/out:' + (Join-Path $bin 'ConnectorScreenProjectionTests.exe')) (Join-Path $root 'tests\ConnectorScreenProjectionTests.cs')
+    if ($LASTEXITCODE -ne 0) { throw 'Connector projection test build failed.' }
+    & (Join-Path $bin 'ConnectorScreenProjectionTests.exe')
+    if ($LASTEXITCODE -ne 0) { throw 'Connector projection tests failed.' }
+    & $compiler /nologo /target:exe '/r:System.Windows.Forms.dll' ('/out:' + (Join-Path $bin 'OfficeEditKeysTests.exe')) (Join-Path $root 'src\OfficeEditKeys.cs') (Join-Path $root 'tests\OfficeEditKeysTests.cs')
+    if ($LASTEXITCODE -ne 0) { throw 'Office edit key test build failed.' }
+    & (Join-Path $bin 'OfficeEditKeysTests.exe')
+    if ($LASTEXITCODE -ne 0) { throw 'Office edit key tests failed.' }
     & $compiler /nologo /target:exe '/r:System.Windows.Forms.dll' ('/r:' + (Join-Path $bin 'OpenSlideCharts.dll')) ('/out:' + (Join-Path $bin 'EditorTests.exe')) (Join-Path $root 'tests\EditorTests.cs')
     if ($LASTEXITCODE -ne 0) { throw 'Editor test build failed.' }
     & (Join-Path $bin 'EditorTests.exe')
