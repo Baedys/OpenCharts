@@ -10,7 +10,7 @@ $sources = @(Get-ChildItem -LiteralPath (Join-Path $root 'src') -Filter '*.cs' |
 & $compiler /nologo /target:library /platform:anycpu /optimize+ '/r:System.Windows.Forms.dll' '/r:System.Drawing.dll' '/r:System.Web.Extensions.dll' '/r:Microsoft.CSharp.dll' '/r:System.Numerics.dll' ("/out:" + (Join-Path $bin 'OpenSlideCharts.dll')) $sources
 if ($LASTEXITCODE -ne 0) { throw 'Add-in build failed.' }
 if ($Test) {
-    $coreSources = @('src\ChartCore.cs', 'src\ChartAppearance.cs', 'src\SeriesChart.cs', 'src\PieChart.cs', 'src\ScatterChart.cs', 'src\ScatterRegression.cs', 'src\WaterfallModel.cs', 'src\WaterfallSolver.cs', 'src\WaterfallGeometry.cs', 'src\WaterfallChart.cs', 'tests\CoreTests.cs') | ForEach-Object { Join-Path $root $_ }
+    $coreSources = @('src\ChartCore.cs', 'src\ChartAppearance.cs', 'src\SeriesChart.cs', 'src\PieChart.cs', 'src\ScatterChart.cs', 'src\ScatterRegression.cs', 'src\GanttModel.cs', 'src\GanttCalendar.cs', 'src\GanttChart.cs', 'src\WaterfallModel.cs', 'src\WaterfallSolver.cs', 'src\WaterfallGeometry.cs', 'src\WaterfallChart.cs', 'tests\CoreTests.cs') | ForEach-Object { Join-Path $root $_ }
     & $compiler /nologo /target:exe '/r:System.Numerics.dll' ("/out:" + (Join-Path $bin 'CoreTests.exe')) $coreSources
     if ($LASTEXITCODE -ne 0) { throw 'Test build failed.' }
     & (Join-Path $bin 'CoreTests.exe')
@@ -71,5 +71,11 @@ if ($Test) {
     if ($LASTEXITCODE -ne 0) { throw 'Scatter editor test build failed.' }
     & (Join-Path $bin 'ScatterEditorTests.exe')
     if ($LASTEXITCODE -ne 0) { throw 'Scatter editor tests failed.' }
+    foreach ($suite in @('GanttCalendarTests', 'GanttTests', 'GanttEditorTests')) {
+        & $compiler /nologo /target:exe '/r:System.Windows.Forms.dll' ('/r:' + (Join-Path $bin 'OpenSlideCharts.dll')) ('/out:' + (Join-Path $bin ($suite + '.exe'))) (Join-Path $root ('tests\' + $suite + '.cs'))
+        if ($LASTEXITCODE -ne 0) { throw ($suite + ' build failed.') }
+        & (Join-Path $bin ($suite + '.exe'))
+        if ($LASTEXITCODE -ne 0) { throw ($suite + ' failed.') }
+    }
 }
 Write-Output ('Built: ' + (Join-Path $bin 'OpenSlideCharts.dll'))

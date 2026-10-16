@@ -1,0 +1,33 @@
+{
+  "Kind": "Gantt",
+  "Title": "Calendrier du projet",
+  "Gantt": {
+    "StartDate": "2026-10-01",
+    "EndDate": "2026-12-31",
+    "Culture": "fr-FR",
+    "WeekendDisplay": "Shaded",
+    "ScaleMode": "Manual",
+    "Scales": [
+      { "Unit": "Months", "Format": "mmmm", "Separators": true },
+      { "Unit": "Weeks", "Format": "ww", "Separators": true }
+    ],
+    "ShowResponsible": true,
+    "Activities": [
+      { "Id": "design", "Label": "Conception", "Responsible": "Produit" },
+      { "Id": "build", "Label": "Réalisation", "Responsible": "Équipe", "Separator": true },
+      { "Id": "test", "Label": "Vérification", "Responsible": "Qualité" }
+    ],
+    "Items": [
+      { "Id": "study", "RowId": "design", "StartDate": "2026-10-05", "EndDate": "2026-10-23", "Label": "Étude" },
+      { "Id": "build1", "RowId": "build", "Kind": "Chevron", "StartDate": "2026-10-26", "EndDate": "2026-11-20", "Label": "Développement", "Color": "#468C75" },
+      { "Id": "test1", "RowId": "test", "StartDate": "2026-11-23", "EndDate": "2026-12-04", "Label": "Validation" },
+      { "Id": "release", "RowId": "__milestones", "Kind": "Milestone", "StartDate": "2026-12-07", "Label": "Version", "Color": "#C05A50" }
+    ],
+    "Shades": [ { "StartDate": "2026-11-11", "EndDate": "2026-11-11", "Label": "Férié", "Color": "#F1E7CE" } ],
+    "Links": [
+      { "FromId": "study", "ToId": "build1" },
+      { "FromId": "build1", "ToId": "test1" },
+      { "FromId": "test1", "ToId": "release" }
+    ]
+  }
+}

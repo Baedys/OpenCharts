@@ -2,6 +2,16 @@
 
 Vérifications effectuées le 15 octobre 2026 sur PowerPoint Windows x64 16.0.20430.20146. Les graphiques sont synthétiques, créés par OpenCharts. Les gestes utilisent le contrôle Windows Computer Use ; les valeurs et contraintes sont ensuite relues par le modèle objet PowerPoint. Ces parcours ne sont pas une comparaison d'exécution avec think-cell. Les fichiers JSON fournis reprennent les données et contraintes des trois fixtures utilisées ; leur import par dialogue n'a pas été exercé pendant ces gestes.
 
+## Calendrier Gantt — 16 octobre 2026
+
+Sur le profil Office x64 local à 200 %, **Modifier les données** a rouvert un Gantt synthétique avec trois objets et une rangée de jalons permanente. L'inspection a révélé un sélecteur de jours de week-end invisible ; sept cases à cocher le remplacent. Le passage final a vérifié leur visibilité, les bornes de calendrier, les commandes d'échelles et les grilles **Activités** et **Objets**. Les activités se choisissent par libellé ; leurs IDs internes restent masqués. La grille des cinq échelles dispose d'un défilement vertical.
+
+Le choix **Week-ends : Ombrés** est passé à **Masqués**, puis **Appliquer** a régénéré le calendrier comprimé. Les positions et dimensions des trois objets natifs concordent avec le modèle à 0,02 point près. Le texte Développement reste visible dans son chevron.
+
+Un Ctrl+Z a restauré `WeekendDisplay="Shaded"`, les bandes et les trois géométries initiales ; un Ctrl+Y a rétabli `Hidden` et les nouvelles géométries. Chaque transition utilise des entrées Windows réelles, suivies d'une relecture COM du modèle et des formes. La présentation synthétique a été sauvegardée/exportée puis fermée, processus terminé avec code 0.
+
+Ce parcours ne valide pas les autres onglets, la saisie interactive de dates/ancres, le collage, tous les réglages d'échelles ni les gestes directs sur les objets. Les suites de géométrie et de persistance complètent ce périmètre ; elles ne constituent pas une comparaison d'exécution avec think-cell.
+
 ## Dispersion et bulles — 16 octobre 2026
 
 Sur le profil Office x64 local à 200 %, **Modifier les données** du ruban a rouvert un groupe de trois bulles synthétiques. Le premier parcours a révélé le champ de titre rogné ; deux hauteurs de lignes explicites corrigent son affichage. Le passage final a vérifié visuellement le titre, les sept en-têtes de données, les deux panneaux d'axes et les options de marqueurs, tailles, grille et légende.

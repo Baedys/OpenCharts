@@ -2,6 +2,17 @@
 
 Tests locaux réalisés les 15–16 octobre 2026, sous Windows avec PowerPoint/Excel de bureau x64, version Office 16.0.20430.20146.
 
+## Jalon calendrier Gantt
+
+- **16 scénarios, 20 156 assertions de calendrier** : jours bissextiles, limites des années, semaines ISO, premier jour configurable, compression des week-ends, heures et fractions préservées, dates extrêmes et formats localisés. Ces nombres comptent les assertions, pas les fonctionnalités.
+- **1 821 contrôles de géométrie** : échelles automatiques/manuelles, ordre des échelles, objets multiples, rangée de jalons, cinq types d'objets, ancres exactes, débordements, couloirs, texte de processus intérieur, caractères combinés et chaînes ZWJ. La segmentation Unicode moderne complète reste hors périmètre.
+- **52 assertions d'éditeur et d'import** : conservation des identités, réglages et données, listes facultatives nulles, import sans objets implicites, création d'IDs uniques, rechargement de choix, ordre des échelles et dates Excel 1900/1904.
+- **9 481 assertions Office, 16 fixtures synthétiques**, processus terminé avec code 0 : formes et textes natifs, échelles/pointillés, cinq types d'objets, texte des processus à l'intérieur de la forme, labels W/CJK, petits cadres et dates limites. Les contrôles incluent métadonnées complètes, ordre des formes, remplacement avec rollback, sauvegarde/réouverture et absence d'OLE, graphique ou image incorporée. Les rendus ont aussi été inspectés visuellement. La hauteur des processus grandit avec leur texte ; son calcul reste original et non harmonisé globalement.
+- **336 assertions de la suite Office standard**, processus terminé avec code 0 : régressions et cinq contrôles Gantt ajoutés avec vrais classeurs synthétiques. Ils vérifient la rangée de jalons, les ancres et leurs identités après actualisation, les instants de midi/minuit, le système 1904 et l'absence de mutation de la source.
+- **Parcours interactif à 200 %** : titre, calendrier, sept cases de jours de week-end, activités et objets visibles ; Ombrés → Masqués puis Appliquer. Un Ctrl+Z restaure le modèle et les trois géométries initiales, un Ctrl+Y rétablit l'état comprimé. Relecture native avec tolérance de 0,02 point, puis sauvegarde/export et fermeture. Voir [UI-VALIDATION.md](UI-VALIDATION.md) pour ses limites.
+
+La revue et les inspections visuelles ont fait corriger quatre défauts d'import/édition, le texte extérieur des flèches de processus, la coupure des accents décomposés et un sélecteur de week-ends invisible à 200 %. Les sources de comportement et les choix originaux figurent dans [GANTT.md](GANTT.md). Ces contrôles ne démontrent aucune parité d'exécution avec think-cell.
+
 ## Jalon dispersion et bulles
 
 - **1 768 assertions de géométrie** : marqueurs, groupes, axes linéaires/logarithmiques/inversés, tailles en aire/diamètre, données absentes, étiquettes et partitions. Le placement et les graduations sont des choix originaux, sans comparaison de référence.

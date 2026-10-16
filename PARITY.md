@@ -17,7 +17,7 @@ Statuts : **prototype** = réalisation partielle testable ; **absent** = non ré
 | Secteurs et anneaux | Prototype | Rotation, quatre ordres, trous transparents, explosions et labels externes réalisés ; gestes sur diapositive, labels intérieurs et comparaison de référence restants. Voir PIE.md |
 | Dispersion et bulles | Prototype | Axes numériques linéaires/log/inversés, groupes, tailles en aire/diamètre, deux labels, partitions et régressions linéaires réalisés ; gestes, légende de tailles, modèles non linéaires et comparaison de référence restants. Voir SCATTER.md |
 | Mekko | Prototype | Nombre arbitraire de segments et axes unitaires |
-| Gantt | Prototype | Calendrier, semaines ISO, jours non ouvrés, jalons, dépendances |
+| Gantt | Prototype | Calendrier, cinq échelles, semaines ISO, week-ends ombrés/masqués, objets multiples, jalons/crochets, ancres Excel et connecteurs visuels réalisés ; poignées, dates liées entre objets, calendriers fiscaux et comparaison de référence restantes. Voir GANTT.md |
 | Placement d'étiquettes | Prototype limité | Géométrie liée et décalages importés pour un profil empilé ; placements et traits de rappel originaux pour secteurs/dispersion ; optimisation générale et parité restantes |
 | Axes et graduations | Prototype | Bornes persistées importables dans le profil vérifié ; ruptures, échelles communes et secondaires restantes |
 | Annotations | Absent | Écarts, taux de croissance, CAGR, accolades et lignes de valeur |

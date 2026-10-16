@@ -5,7 +5,8 @@ Complément PowerPoint Windows open source, sous licence MIT. Le complément s'i
 ## État actuel
 
 - Ruban PowerPoint avec insertion et modification de graphiques.
-- Dix types de graphiques : cascade, colonnes, barres, courbe, Mekko à deux segments, Gantt en jours relatifs, secteurs, anneaux, dispersion et bulles.
+- Dix types de graphiques : cascade, colonnes, barres, courbe, Mekko à deux segments, Gantt avec calendrier, secteurs, anneaux, dispersion et bulles.
+- Gantt : dates, cinq échelles, week-ends ombrés/masqués, plusieurs objets par activité, jalons, crochets, ombres et ancres Excel. Voir [GANTT.md](GANTT.md).
 - Dispersion/bulles : groupes, marqueurs, axes numériques linéaires/logarithmiques/inversés, tailles proportionnelles à l'aire ou au diamètre, partitions et régressions linéaires. Voir [SCATTER.md](SCATTER.md).
 - Secteurs/anneaux : rotation, quatre ordres, trou transparent, éclatements, couleurs et labels externes depuis un éditeur dédié. Voir [PIE.md](PIE.md).
 - Cascades multi-segments avec valeurs calculées `e`, connecteurs et ancrages modifiables ; calcul exact des contraintes.
@@ -47,17 +48,19 @@ Le script retire uniquement les clés d'inscription OpenSlideCharts. Il conserve
 
 ## Données
 
-Hors dispersion/bulles, l'import Excel attend deux à quatre colonnes (`Libellé`, `Valeur`, `Secondaire`, `Total`), sans en-tête, jusqu'à 40 lignes. Ces graphiques acceptent jusqu'à 80 lignes ; la disposition des étiquettes dépend du type et de la place disponible.
+Pour les graphiques historiques à `Rows`, l'import Excel attend deux à quatre colonnes (`Libellé`, `Valeur`, `Secondaire`, `Total`), sans en-tête, jusqu'à 40 lignes. Ces graphiques acceptent jusqu'à 80 lignes ; la disposition des étiquettes dépend du type et de la place disponible.
 
 | Type | Valeur | Secondaire | Total |
 |---|---|---|---|
 | Cascade | Variation ou niveau absolu | Ignoré | Un niveau absolu remet le cumul à cette valeur |
 | Colonnes, barres, courbe | Valeur signée | Ignoré | Ignoré |
 | Mekko | Largeur positive ou nulle | Part bleue de 0 à 100 % | Ignoré |
-| Gantt | Début en jours relatifs | Durée strictement positive | Ignoré |
+| Gantt historique avec Rows | Début en jours relatifs | Durée strictement positive | Ignoré |
 | Secteurs, anneaux | Valeur non négative ; au moins une positive | Doit rester nul | Doit rester faux |
 
 Dispersion/bulles utilisent un modèle de points distinct : `Libellé, X, Y, Taille, Groupe, Couleur, Marqueur`. Le lien Excel accepte trois à sept colonnes, jusqu'à 1 000 lignes. Ajouter/retirer les tailles convertit automatiquement le type ; voir [SCATTER.md](SCATTER.md) pour les cellules absentes, styles et limites.
+
+Le nouveau Gantt utilise `ChartSpec.Gantt`, avec activités, objets et dates ISO. Son tableau Excel apporte des libellés et ancres de dates : la première ligne reste réservée aux jalons, la première colonne contient le libellé et les suivantes des dates. Il ne crée pas de barres implicitement. Voir [GANTT.md](GANTT.md).
 
 Pour modifier, sélectionner le groupe ou une de ses formes et choisir **Modifier les données**. Les données sont sauvegardées avec le PPTX. Pour une liaison Excel, préciser fichier, feuille et plage ; **Importer Excel** lit les valeurs enregistrées. Les macros et mises à jour de liens externes sont désactivées pour cette ouverture de lecture. Un fichier absent ne supprime pas les données embarquées.
 
@@ -73,7 +76,7 @@ Sélectionner une cascade à contraintes puis **Éditer les connecteurs** expose
 
 **Undo/Redo : validation limitée.** Le nouveau glissement par poignée d’interface est annulé/rétabli en une étape dans le scénario du total à gauche, modèle et géométrie ensemble. La modification directe d’une forme native, notamment via COM ou quand les poignées d’interface sont masquées, conserve le défaut antérieur : un seul Undo peut laisser modèle et ligne incohérents. Les poignées exigent un graphique entièrement visible, sans rotation ni retournement, et le focus diapositive du profil Office testé. Détails dans [UI-VALIDATION.md](UI-VALIDATION.md).
 
-Cette version n'édite pas les objets propriétaires think-cell. Son menu contextuel se limite aux cascades ; le menu radial complet et le placement automatique restent à réaliser. Secteurs/anneaux restent dépourvus de poignées sur la diapositive et de labels intérieurs. Le moteur ne gère pas encore les graphiques combinés, les dates calendaires ou les ruptures d'axe. L'actualisation n'est pas automatique et ne lit pas les modifications Excel non enregistrées.
+Cette version n'édite pas les objets propriétaires think-cell. Son menu contextuel se limite aux cascades ; le menu radial complet et le placement automatique restent à réaliser. Secteurs/anneaux restent dépourvus de poignées sur la diapositive et de labels intérieurs. Le moteur ne gère pas encore les graphiques combinés, les axes de dates hors Gantt ou les ruptures d'axe. L'actualisation n'est pas automatique et ne lit pas les modifications Excel non enregistrées.
 
 La réédition régénère les formes ; les personnalisations manuelles et animations des formes internes ne sont pas conservées. Les groupes doivent être sans rotation pour être réédités. La disposition par défaut exige au moins 320 × 240 points ; une zone de tracé explicite importée permet des cadres plus petits, sous réserve que la géométrie finale reste dans le cadre. Changer le type ou le mode rétablit la disposition standard : agrandir d’abord les petits groupes à au moins 320 × 240 points. L’éditeur valide les dimensions avant de fermer. Un groupe dissocié perd sa fonction d’édition structurée.
 
@@ -83,7 +86,9 @@ La réédition régénère les formes ; les personnalisations manuelles et anima
 
 Les tests d'intégration distribués nécessitent Office installé et utilisent des documents synthétiques. Des comparaisons privées supplémentaires portent sur un profil de colonnes empilées, décrit dans [RECONSTRUCTION.md](RECONSTRUCTION.md). Elles ne démontrent ni parité visuelle globale ni parité des interactions.
 
-Résultats et limites détaillés dans [VALIDATION.md](VALIDATION.md). Le jalon dispersion/bulles ajoute **1 768 assertions de géométrie, 358 de régression sur 25 scénarios, 32 d'éditeur/données/stockage et 23 347 assertions Office sur 17 fixtures**. La suite Office standard passe désormais **331 assertions**, dont les conversions Excel dispersion/bulles. Un échec antérieur de comparaison des métadonnées n'a pas été reproduit ; sa cause reste inconnue et un diagnostic plus précis est conservé.
+Résultats et limites détaillés dans [VALIDATION.md](VALIDATION.md). Le jalon Gantt ajoute **20 156 assertions de calendrier sur 16 scénarios, 1 821 contrôles de géométrie, 52 assertions d'éditeur/import et 9 481 assertions Office sur 16 fixtures**. La suite Office standard passe **336 assertions**, dont les ancres Gantt et les deux systèmes de dates Excel. Un parcours interactif à 200 % vérifie changement des week-ends et Undo/Redo, modèle et géométrie ensemble.
+
+Le jalon dispersion/bulles conserve 1 768 assertions de géométrie, 358 de régression sur 25 scénarios, 32 d'éditeur/données/stockage et 23 347 assertions Office sur 17 fixtures. Sa suite Office standard passait 331 assertions, dont les conversions Excel dispersion/bulles. Un échec antérieur de comparaison des métadonnées n'a pas été reproduit ; sa cause reste inconnue et un diagnostic plus précis est conservé.
 
 Le jalon secteurs/anneaux conserve 740 contrôles de géométrie, 21 assertions d'éditeur et 1 684 assertions Office sur 12 fixtures. Les résultats antérieurs restent consignés séparément : 3 822 assertions moteur, 169 de solveur, 363 d'interaction du modèle, 66 de commandes, 25 d'éditeur, 55 du pont COM, 16 du minuteur, 58 tests Python, 53 d'interaction Office et 399 de la suite Office avec le profil de référence optionnel. Sur ce profil empilé, les bords des neuf segments reconstruits diffèrent au plus d'un pixel à 1440 × 810 ; cela ne couvre ni toutes les étiquettes ni les interactions.
 
@@ -96,6 +101,8 @@ Après installation, fermer PowerPoint puis lancer `Test-Office.ps1`. Le script 
 - `src/PieChart.cs`, `src/PieEditor.cs` : géométrie et édition des secteurs/anneaux.
 - `src/ScatterChart.cs`, `src/ScatterEditor.cs`, `src/ScatterData.cs` : dispersion/bulles, données et édition.
 - `src/ScatterRegression.cs` : régression normalisée avec calcul exact interne.
+- `src/GanttModel.cs`, `GanttCalendar.cs`, `GanttChart.cs` : activités, dates et géométrie du calendrier.
+- `src/GanttEditor.cs`, `GanttData.cs` : édition et ancres Excel.
 - `src/ChartAppearance.cs` : propriétés d'apparence importée et validation.
 - `src/OfficeAdapter.cs` : formes PowerPoint, persistance et lecture Excel.
 - `src/ChartEditor.cs` : éditeur WinForms.

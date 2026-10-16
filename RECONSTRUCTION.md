@@ -1,5 +1,11 @@
 # Journal de reconstruction
 
+## Calendrier Gantt
+
+Le calendrier daté s'appuie sur le manuel actuel, les descriptions de données Excel et deux KB officielles. Les sources distinguent dates inclusives de l'éditeur, instants exacts des ancres Excel et connecteurs visuels. Le modèle conserve cette distinction sans inventer de moteur de calcul de planning. La documentation anglaise actuelle conserve les libellés des objets masqués, contrairement à l'ancien manuel local et à d'autres traductions ; ce choix de version est explicite dans [GANTT.md](GANTT.md).
+
+Une recherche statique privée a localisé 38 chaînes réparties en cinq groupes avec offsets, RVA et hashes sur la même DLL x64. Elle réutilise uniquement l'identité et l'inventaire de ressources REA existants ; les noms ne prouvent ni algorithmes ni sémantique de dates. Aucune nouvelle session Ghidra ni exécution propriétaire n'a été lancée. Projection grégorienne, échelles automatiques, placement par couloirs et règles de refus sont des réalisations originales, avec limites publiées.
+
 ## Dispersion et bulles
 
 Le manuel public, les descriptions des axes et les KB de conversion/échelle ont servi à définir points, groupes, contenus d'étiquettes, représentation de tailles, partitions et régressions. La projection linéaire est centrée avant normalisation. Les moments et intersections des tendances utilisent des rationnels exacts avant leur conversion en coordonnées de formes ; cette architecture et l'heuristique de labels sont originales. La pondération par Taille brute reste un choix explicite, distinct de l'expression moins précise « taille des bulles » du manuel.

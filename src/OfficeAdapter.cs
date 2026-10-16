@@ -215,6 +215,12 @@ namespace OpenSlideCharts
                 sheets = book.Worksheets; sheet = sheets.Item(source.Worksheet); range = sheet.Range[source.RangeAddress];
                 rows = range.Rows; columns = range.Columns; areas = range.Areas;
                 int rowCount = rows.Count, colCount = columns.Count;
+                if (source.Gantt != null)
+                {
+                    if (rowCount < 1 || rowCount > 101 || colCount < 2 || colCount > 33 || (int)areas.Count != 1)
+                        throw new ArgumentException("Gantt : plage contiguë de 1 à 101 lignes et 2 à 33 colonnes ; première ligne réservée aux jalons.");
+                    return GanttData.ReadCells(source, range.Value2 as object[,], (bool)book.Date1904);
+                }
                 if (String.Equals(source.Kind, "Scatter", StringComparison.OrdinalIgnoreCase) || String.Equals(source.Kind, "Bubble", StringComparison.OrdinalIgnoreCase))
                 {
                     if (rowCount < 1 || rowCount > 1000 || colCount < 3 || colCount > 7 || (int)areas.Count != 1)

@@ -200,6 +200,7 @@ namespace OpenSlideCharts
                 dynamic slide = ActiveSlide();
                 string kind = (string)((dynamic)control).Tag;
                 if (kind == "Waterfall") { InsertSpec(WaterfallProfiles.Sample()); return; }
+                if (kind == "Gantt") { InsertSpec(GanttSamples.Create()); return; }
                 if (kind == "Pie" || kind == "Doughnut") { InsertSpec(ChartSamples.Create(kind)); return; }
                 if (kind == "Scatter" || kind == "Bubble") { InsertSpec(ChartSamples.Create(kind)); return; }
                 using (ChartEditor editor = new ChartEditor(ChartSamples.Create(kind)))
@@ -243,6 +244,10 @@ namespace OpenSlideCharts
         public void EndConnectorEditing(object control) { Run(delegate { if (slideEditor != null) slideEditor.Stop(true, true); InvalidateRibbon(); }); }
         private static ChartSpec EditSpec(ChartSpec source, double? width = null, double? height = null)
         {
+            if (source.Gantt != null)
+            {
+                using (var editor = new GanttEditor(source, width ?? 900, height ?? 470)) return editor.ShowDialog() == DialogResult.OK ? editor.Spec : null;
+            }
             if (String.Equals(source.Kind, "Scatter", StringComparison.OrdinalIgnoreCase) || String.Equals(source.Kind, "Bubble", StringComparison.OrdinalIgnoreCase))
             {
                 using (var editor = new ScatterEditor(source, width ?? 720, height ?? 400)) return editor.ShowDialog() == DialogResult.OK ? editor.Spec : null;
