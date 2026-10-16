@@ -1,6 +1,6 @@
 # OpenCharts
 
-Complément PowerPoint Windows open source, sous licence MIT. Le complément s'inscrit actuellement sous le nom **OpenSlideCharts**. Objectif de recherche et de développement : reproduire les fonctionnalités et interactions de think-cell. **La parité n'est pas atteinte. Ce dépôt contient un prototype fonctionnel, pas un remplacement complet.**
+Complément PowerPoint Windows open source, sous licence Apache. Le complément s'inscrit actuellement sous le nom **OpenSlideCharts**. Objectif de recherche et de développement : reproduire les fonctionnalités et interactions de think-cell. **La parité n'est pas atteinte. Ce dépôt contient un prototype fonctionnel, pas un remplacement complet.**
 
 ## État actuel
 
@@ -118,7 +118,7 @@ Après installation, fermer PowerPoint puis lancer `Test-Office.ps1`. Le script 
 
 ## Licence et contribution
 
-Code original distribué sous [licence MIT](LICENSE). Aucun installateur, binaire, code décompilé ou asset de think-cell n'est inclus. Projet indépendant et non affilié à think-cell. Toute contribution de parité doit préciser le comportement de référence, sa source et un test reproductible.
+Code original distribué sous [licence Apache](LICENSE). Aucun installateur, binaire, code décompilé ou asset de think-cell n'est inclus. Projet indépendant et non affilié à think-cell. Toute contribution de parité doit préciser le comportement de référence, sa source et un test reproductible.
 
 ## Inspection et conversion de données think-cell
 
